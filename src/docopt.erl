@@ -84,30 +84,6 @@ get_value_shorts(H, [], [])         -> throw({H, "requires an argument"});
 get_value_shorts(_, [], [Arg|Rest]) -> {Arg, Rest};
 get_value_shorts(_, Arg, Rest)      -> {Arg, Rest}.
 
-
-formal_usage(Str) ->
-  Str.
-
-printable_usage(Doc) ->
-  UsageSplit = re:split(Doc, "([Uu][Ss][Aa][Gg][Ee]:)", [{return, list}]),
-  UsageSplit.
-
-parse_pattern(Source, Options) ->
-  ok.
-
-printable_and_formal_usage_test_() ->
-  Doc =
-    "Usage: prog [-hv]
-            prog N M
-     prog is a program.",
-  [ ?_assertEqual("Usage: prog [-hv] ARG\n           prog N M",
-                 printable_usage(Doc))
-  , ?_assertEqual("( [-hv] ARG ) | ( N M )",
-                  formal_usage(printable_usage(Doc)))
-  , ?_assertEqual("uSaGe: prog ARG",
-                  printable_usage("uSaGe: prog ARG\n\t \t\n bla"))
-  ].
-
 parse_args_test_() ->
   HelpOpt    = #option{short="-h", value=true},
   FileOpt    = #option{short="-f", long="--file", argcount=1, value="f.txt"},
@@ -132,6 +108,43 @@ parse_args_test_() ->
   , ?_assertEqual([HelpOpt, Arg("arg"), Arg("--"), Arg("-v")],
                   parse_args("-h arg -- -v", O))
   ].
+
+printable_usage(Doc) ->
+  case re:split(Doc, "([Uu][Ss][Aa][Gg][Ee]:)", [{return, list}]) of
+    UsageSplit when length(UsageSplit) < 3 ->
+      throw("\"usage:\" (case-insensitive) not found.");
+    UsageSplit when length(UsageSplit) > 3 ->
+      throw("More than one \"usage:\" (case-insensitive)");
+    [_|UsageSplit] ->
+      L = re:split(lists:flatten(UsageSplit), "\\n\\s*\\n", [{return, list}]),
+      string:strip(hd(L))
+  end.
+
+formal_usage(PrintableUsage) ->
+  %% Split and drop "usage:"
+  [_Usage, ProgName|Args] = string:tokens(PrintableUsage, " \n"),
+  F = fun (S) when (S) == ProgName -> ") | (";
+          (S)                      -> S
+      end,
+  "( " ++ string:join(lists:map(F, Args), " ") ++ " )".
+
+printable_and_formal_usage_test_() ->
+  Doc =
+    "Usage: prog [-hv] ARG
+            prog N M
+
+     prog is a program.",
+  [ ?_assertEqual("Usage: prog [-hv] ARG\n            prog N M",
+                  printable_usage(Doc))
+  , ?_assertEqual("( [-hv] ARG ) | ( N M )",
+                  formal_usage(printable_usage(Doc)))
+  , ?_assertEqual("uSaGe: prog ARG",
+                  printable_usage("uSaGe: prog ARG\n\t \t\n bla"))
+  ].
+
+
+parse_pattern(Source, Options) ->
+  ok.
 
 %% docopt_any_options_test_() ->
 %%   Doc = "Usage: prog [options] A
