@@ -2,17 +2,49 @@
 
 -compile([export_all]).
 
+%%%_* Includes ================================================================
+
 -include_lib("eunit/include/eunit.hrl").
 
--record(option, { short
-                , long
-                , argcount = 0
-                , value    = false
-                }).
+%%%_* Records =================================================================
 
--record(argument, { name
-                  , value
-                  }).
+-record(st, { options = [] :: [child_pattern()]
+            , tokens  = [] :: [string()]
+            , mode         :: parse_mode()
+            }).
+
+%% Parent patterns
+-record(one_or_more , {children :: [pattern()]}).
+-record(required    , {children :: [pattern()]}).
+-record(optional    , {children :: [pattern()]}).
+-record(either      , {children :: [pattern()]}).
+
+%% Child patterns
+-record(command  , {name :: string(), value :: any()}).
+-record(argument , {name :: string(), value :: any()}).
+-record(option   , { short            :: string()
+                   , long             :: string()
+                   , argcount = 0     :: non_neg_integer()
+                   , value    = false :: any()
+                   }).
+
+%%%_* Types ===================================================================
+
+-type pattern() :: child_pattern() | parent_pattern().
+
+%% Types
+-type child_pattern()  :: #command{}
+                        | #argument{}
+                        | #option{}.
+
+-type parent_pattern() :: #one_or_more{}
+                        | #required{}
+                        | #optional{}
+                        | #either{}.
+
+-type parse_mode() :: parse_args | parse_pattern.
+
+%%%_* Code ====================================================================
 
 docopt(Doc, Args) ->
   Options = parse_doc_options(Doc),
@@ -24,90 +56,79 @@ parse_doc_options(Doc) ->
   [option_parse("-" ++ S) || S <- OptStrings].
 
 parse_args(Args, Options) ->
-  Tokens = string:tokens(Args, " "),
-  parse_args_tokens(Tokens, Options).
+  State = #st{ tokens  = string:tokens(Args, " ")
+             , options = Options
+             , mode    = parse_args
+             },
+  parse_args_tokens(State).
 
-parse_args_tokens([], _Options)            -> [];
-parse_args_tokens([Current|Rest]=Tokens, Options) ->
-  case Current of
-    "--"           -> [#argument{value=Arg} || Arg <- Tokens];
+parse_args_tokens(#st{tokens=[]})                    -> [];
+parse_args_tokens(State0) ->
+  case current(State0) of
+    "--"           -> [#argument{value=Arg} || Arg <- tokens(State0)];
     [$-,$-|_]      ->
-      {Opt, NewRest} = parse_long(Current, Rest, Options),
-      [Opt|parse_args_tokens(NewRest, Options)];
-    [$-|[_|_]=Raw] ->
-      {Opts, NewRest} = parse_shorts(Raw, Rest, Options, []),
-      Opts ++ parse_args_tokens(NewRest, Options);
+      {Opt, State} = parse_long(State0),
+      Opt ++ parse_args_tokens(State);
+    [$-|_] ->
+      {Opts, State} = parse_shorts(State0),
+      Opts ++ parse_args_tokens(State);
     _              ->
-      [#argument{value=Current}|parse_args_tokens(Rest, Options)]
+      [#argument{value=current(State0)}|parse_args_tokens(move(State0))]
   end.
 
-parse_long(Current, Rest, Options) ->
-  {Raw, Value} = partition(Current, "="),
+current(#st{tokens=[Current|_]}) -> Current;
+current(#st{tokens=[]})          -> undefined.
+move(#st{tokens=[_|Rest]}=St)    -> St#st{tokens=Rest}.
+tokens(#st{tokens=Tokens})       -> Tokens.
+rest(#st{tokens=[_|Rest]})       -> Rest.
+options(#st{options=Options})    -> Options.
+
+parse_long(State0) ->
+  {Raw, Value} = partition(current(State0), "="),
   Opt =
-    case [O || O <- Options, O#option.long == Raw] of
+    case [O || O <- options(State0), O#option.long == Raw] of
       [O] -> O;
       []  ->
-        case [O || O <- Options, starts_with(O#option.long, Raw)] of
+        case [O || O <- options(State0), starts_with(O#option.long, Raw)] of
           []                         -> throw({Raw, "not recognized"});
           Opts when length(Opts) > 1 -> throw({Raw, "is not a unique prefix"});
           [O]                        -> O
         end
     end,
+  Rest  = rest(State0),
+  State = move(State0),
   case Opt#option.argcount of
-    1 when Value == [], Rest == [] -> throw({Raw, "requires an argument"});
-    1 when Value == []             -> {Opt#option{value = hd(Rest)}, tl(Rest)};
-    1 when Value /= []             -> {Opt#option{value = Value}, Rest};
-    0 when Value /= []             -> throw({Raw, "must not have an argument"});
-    0 when Value == []             -> {Opt#option{value = true}, Rest}
+    1 when Value == [],
+           Rest  == [] -> throw({Raw, "requires an argument"});
+    1 when Value == [] -> {[Opt#option{value = current(State)}], move(State)};
+    1 when Value /= [] -> {[Opt#option{value = Value}], State};
+    0 when Value /= [] -> throw({Raw, "must not have an argument"});
+    0 when Value == [] -> {[Opt#option{value = true}], State}
   end.
 
 starts_with(Str, SubStr) when is_list(Str), is_list(SubStr) ->
   string:str(Str, SubStr) == 1;
 starts_with(_, _) -> false.
 
-parse_shorts([], Rest, _Options, Acc) -> {lists:reverse(Acc), Rest};
-parse_shorts([H|T], Rest, Options, Acc) ->
- case [O || O <- Options, tl(O#option.short) == [H]] of
-   []                       -> throw({[$-, H], "not recognized"});
+parse_shorts(State) ->
+  [$-|Tokens] = current(State),
+  parse_shorts(Tokens, move(State), []).
+
+parse_shorts([], State, Acc) -> {lists:reverse(Acc), State};
+parse_shorts([H|T], State, Acc) ->
+ case [O || O <- options(State), tl(O#option.short) == [H]] of
+   []                       -> throw({[$-, H], "not recognized", State});
    Opt when length(Opt) > 1 -> throw({[$-, H], "specified ambiguously"});
    [Opt] when Opt#option.argcount == 0 ->
-     parse_shorts(T, Rest, Options, [Opt#option{value = true}|Acc]);
+     parse_shorts(T, State, [Opt#option{value = true}|Acc]);
    [Opt] ->
-     {Value, NewRest} = case Opt#option.argcount of
-                          0 -> {true, Rest};
-                          1 -> get_value_shorts(H, T, Rest)
-                        end,
-     {[Opt#option{value = Value}], NewRest}
+     {Value, Rest} = get_value_shorts(H, T, State),
+     {[Opt#option{value = Value}], Rest}
  end.
 
-get_value_shorts(H, [], [])         -> throw({H, "requires an argument"});
-get_value_shorts(_, [], [Arg|Rest]) -> {Arg, Rest};
-get_value_shorts(_, Arg, Rest)      -> {Arg, Rest}.
-
-parse_args_test_() ->
-  HelpOpt    = #option{short="-h", value=true},
-  FileOpt    = #option{short="-f", long="--file", argcount=1, value="f.txt"},
-  VerboseOpt = #option{short="-v", long="--verbose", value=true},
-  Arg        = fun(V) -> #argument{value=V} end,
-  O = [ #option{short="-h"}
-      , #option{short="-v", long="--verbose"}
-      , #option{short="-f", long="--file", argcount=1}
-      ],
-  [ ?_assertEqual([]                    , parse_args(""                , O))
-  , ?_assertEqual([HelpOpt]             , parse_args("-h"              , O))
-  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-h -v"           , O))
-  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-hv"             , O))
-  , ?_assertEqual([HelpOpt, FileOpt]    , parse_args("-h -f f.txt"     , O))
-  , ?_assertEqual([HelpOpt, FileOpt]    , parse_args("-h --file f.txt" , O))
-  , ?_assertEqual([HelpOpt, FileOpt]    , parse_args("-h --file=f.txt" , O))
-  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-h --verbose"    , O))
-  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-h --ver"        , O))
-  , ?_assertEqual([Arg("arg")]          , parse_args("arg"             , O))
-  , ?_assertEqual([HelpOpt, FileOpt, Arg("arg"), Arg("arg2")],
-                  parse_args("-h --file f.txt arg arg2", O))
-  , ?_assertEqual([HelpOpt, Arg("arg"), Arg("--"), Arg("-v")],
-                  parse_args("-h arg -- -v", O))
-  ].
+get_value_shorts(H, [], [])     -> throw({H, "requires an argument"});
+get_value_shorts(_, [], State)  -> {current(State), move(State)};
+get_value_shorts(_, Arg, State) -> {Arg, State}.
 
 printable_usage(Doc) ->
   case re:split(Doc, "([Uu][Ss][Aa][Gg][Ee]:)", [{return, list}]) of
@@ -123,28 +144,102 @@ printable_usage(Doc) ->
 formal_usage(PrintableUsage) ->
   %% Split and drop "usage:"
   [_Usage, ProgName|Args] = string:tokens(PrintableUsage, " \n"),
-  F = fun (S) when (S) == ProgName -> ") | (";
-          (S)                      -> S
+  F = fun (S) when S == ProgName -> ") | (";
+          (S)                    -> S
       end,
   "( " ++ string:join(lists:map(F, Args), " ") ++ " )".
 
-printable_and_formal_usage_test_() ->
-  Doc =
-    "Usage: prog [-hv] ARG
-            prog N M
+parse_pattern(Source0, Options) ->
+  %% Add spaces around []()| and ...
+  Source = re:replace(Source0, "([\\[\\]\\(\\)\\|]|\\.\\.\\.)", " \\1 ",
+                      [{return, list}, global]),
+  State = #st{ tokens  = string:tokens(Source, " ")
+             , options = Options
+             , mode    = parse_pattern
+             },
+  {Result, _} = parse_expr(State),
+  #required{children=Result}.
 
-     prog is a program.",
-  [ ?_assertEqual("Usage: prog [-hv] ARG\n            prog N M",
-                  printable_usage(Doc))
-  , ?_assertEqual("( [-hv] ARG ) | ( N M )",
-                  formal_usage(printable_usage(Doc)))
-  , ?_assertEqual("uSaGe: prog ARG",
-                  printable_usage("uSaGe: prog ARG\n\t \t\n bla"))
-  ].
+% expr ::= seq ( '|' seq )* ;
+parse_expr(State0) ->
+  {Seq, State} = parse_seq(State0),
+  case current(State) of
+    "|" -> parse_expr(move(State), [maybe_required_seq(Seq)]);
+    _   -> {Seq, State}
+  end.
 
+parse_expr(State0, Acc)                 ->
+  ct:pal("in parse_expr: ~p, ~p", [tokens(State0), Acc]),
+  {Seq, State} = parse_seq(State0),
+  ct:pal("in parse_expr after parse_seq: ~p, ~p", [tokens(State), Seq]),
+  case current(State) of
+    "|" -> parse_expr(move(State), [maybe_required_seq(Seq)|Acc]);
+    _   ->
+      Result = lists:reverse([maybe_required_seq(Seq)|Acc]),
+      case length(Result) > 1 of
+        true  -> {[#either{children=Result}], State};
+        false -> {Result, State} % Needed?
+      end
+   end.
 
-parse_pattern(Source, Options) ->
-  ok.
+maybe_required_seq([Seq]) -> Seq;
+maybe_required_seq(Seq)   -> #required{children=Seq}.
+
+%% seq ::= ( atom [ '...' ] )* ;
+parse_seq(State) -> parse_seq(State, []).
+
+parse_seq(#st{tokens=[]}      = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(#st{tokens=["]"|_]} = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(#st{tokens=[")"|_]} = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(#st{tokens=["|"|_]} = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(State0, Acc) ->
+  ct:pal("in parse seq: ~p, ~p", [tokens(State0), Acc]),
+  {Atom, State} = parse_atom(State0),
+  ct:pal("in parse seq after parse_atom: ~p, ~p, ~p", [Atom, tokens(State), Acc]),
+  case current(State) of
+    "..." -> parse_seq(move(State), [#one_or_more{children=Atom}|Acc]);
+    _     -> parse_seq(State, Atom ++ Acc)
+  end.
+
+%% atom ::= '(' expr ')' | '[' expr ']' | 'options'
+%%       | long | shorts | argument | command ;
+parse_atom(State) ->
+  ct:pal("in parse atom: ~p", [tokens(State)]),
+  case current(State) of
+    "["       -> parse_optional(move(State));
+    "("       -> parse_required(move(State));
+    "options" -> {options(State), move(State)};
+    [$-,$-|_] -> parse_long(State);
+    [$-|_]    -> parse_shorts(State);
+    Current   ->
+      case is_arg(Current) of
+        true  ->
+          ct:pal("returning argument: ~p, ~p", [Current, tokens(State)]),
+          {[#argument{name=Current}], move(State)};
+        false -> {[#command{name=Current}], move(State)}
+      end
+  end.
+
+parse_optional(State0) ->
+  ct:pal("parse optional ~p", [State0]),
+  {Expr, State} = parse_expr(State0),
+  ct:pal("parse optional after parse_expr ~p\n~p", [Expr, State]),
+  case current(State) of
+    "]" -> {[#optional{children=Expr}], move(State)};
+    _   -> throw("Unmatched '['")
+  end.
+
+parse_required(State0) ->
+  ct:pal("parse required ~p", [tokens(State0)]),
+  {Expr, State} = parse_expr(State0),
+  ct:pal("parse required after parse_expr ~p, ~p", [tokens(State), Expr]),
+  case current(State) of
+    ")" -> {[#required{children=Expr}], move(State)};
+    Res -> throw({"Unmatched '(':", Res})
+  end.
+
+is_arg(S) ->
+  (hd(S) == $< andalso lists:last(S) == $>) orelse string:to_upper(S) == S.
 
 %% docopt_any_options_test_() ->
 %%   Doc = "Usage: prog [options] A
@@ -189,6 +284,151 @@ partition(Str, Delim) ->
       {Left, Right}
   end.
 
+%%%_* Tests ===================================================================
+
+parse_atom_test_() ->
+  O = [ #option{short="-h"}
+      , #option{short="-v", long="--verbose"}
+      , #option{short="-f", long="--file", argcount=1}
+      ],
+  St = fun(Tokens) ->
+           #st{ options = O
+              , tokens  = Tokens
+              , mode    = parse_pattern}
+       end,
+  [ ?_assertEqual({[#argument{name="FOO"}], St([])},
+                  parse_atom(St(["FOO"])))
+  , ?_assertEqual({[#argument{name="<foo>"}], St([])},
+                  parse_atom(St(["<foo>"])))
+  , ?_assertEqual({[#command{name="foo"}], St([])},
+                  parse_atom(St(["foo"])))
+  , ?_assertEqual({O, St([])},
+                  parse_atom(St(["options"])))
+  , ?_assertEqual({[#option{short="-v", long="--verbose", value=true}], St([])},
+                  parse_atom(St(["--verbose"])))
+  , ?_assertEqual({[#option{short="-h", value=true}], St([])},
+                  parse_atom(St(["-h"])))
+  , ?_assertEqual({[#required{children=[#argument{name="FOO"}]}], St([])},
+                  parse_atom(St(["(", "FOO", ")"])))
+  ].
+
+printable_and_formal_usage_test_() ->
+  Doc =
+    "Usage: prog [-hv] ARG
+            prog N M
+
+     prog is a program.",
+  [ ?_assertEqual("Usage: prog [-hv] ARG\n            prog N M",
+                  printable_usage(Doc))
+  , ?_assertEqual("( [-hv] ARG ) | ( N M )",
+                  formal_usage(printable_usage(Doc)))
+  , ?_assertEqual("uSaGe: prog ARG",
+                  printable_usage("uSaGe: prog ARG\n\t \t\n bla"))
+  ].
+
+parse_args_test_() ->
+  HelpOpt    = #option{short="-h", value=true},
+  FileOpt    = #option{short="-f", long="--file", argcount=1, value="f.txt"},
+  VerboseOpt = #option{short="-v", long="--verbose", value=true},
+  Arg        = fun(V) -> #argument{value=V} end,
+  O = [ #option{short="-h"}
+      , #option{short="-v", long="--verbose"}
+      , #option{short="-f", long="--file", argcount=1}
+      ],
+  [ ?_assertEqual([]                    , parse_args(""                , O))
+  , ?_assertEqual([HelpOpt]             , parse_args("-h"              , O))
+  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-h -v"           , O))
+  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-hv"             , O))
+  , ?_assertEqual([HelpOpt, FileOpt]    , parse_args("-h -f f.txt"     , O))
+  , ?_assertEqual([HelpOpt, FileOpt]    , parse_args("-h -ff.txt"      , O))
+  , ?_assertEqual([HelpOpt, FileOpt]    , parse_args("-h --file f.txt" , O))
+  , ?_assertEqual([HelpOpt, FileOpt]    , parse_args("-h --file=f.txt" , O))
+  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-h --verbose"    , O))
+  , ?_assertEqual([HelpOpt, VerboseOpt] , parse_args("-h --ver"        , O))
+  , ?_assertEqual([Arg("arg")]          , parse_args("arg"             , O))
+  , ?_assertEqual([HelpOpt, FileOpt, Arg("arg"), Arg("arg2")],
+                  parse_args("-h --file f.txt arg arg2", O))
+  , ?_assertEqual([HelpOpt, Arg("arg"), Arg("--"), Arg("-v")],
+                  parse_args("-h arg -- -v", O))
+  ].
+
+parse_pattern_test_() ->
+  HelpOpt    = #option{short="-h", value=true},
+  FileOpt    = #option{short="-f", long="--file", argcount=1, value="<f>"},
+  VerboseOpt = #option{short="-v", long="--verbose", value=true},
+  O = [option("-h"), option("-v", "--verbose"), option("-f", "--file", 1)],
+  [ ?_assertEqual(
+       required([optional([HelpOpt])]),
+       parse_pattern("[ -h ]", O))
+  , ?_assertEqual(
+       required([optional([one_or_more([argument("ARG")])])]),
+       parse_pattern("[ ARG ... ]", O))
+  , ?_assertEqual(
+       required([optional([either([HelpOpt, VerboseOpt])])]),
+       parse_pattern("[ -h | -v ]", O))
+  , ?_assertEqual(
+       required([VerboseOpt, optional([FileOpt])]),
+       parse_pattern("-v [ --file <f> ]", O))
+  , ?_assertEqual(
+       required([optional([either([argument("M"),
+                                   required([either([argument("K"),
+                                                     argument("L")])])])])]),
+       parse_pattern("[M | (K | L)]", O))
+  , ?_assertEqual(
+       required([argument("N"), argument("M")]),
+       parse_pattern("N M", O))
+  , ?_assertEqual(
+       required([argument("N"), optional([argument("M")])]),
+       parse_pattern("N [M]", O))
+  , ?_assertEqual(
+       required([argument("N"), optional([either([argument("M"),
+                                                  argument("K"),
+                                                  argument("L")])])]),
+      parse_pattern("N [M | K | L]", O))
+  , ?_assertEqual(
+       required([optional([HelpOpt]), optional([argument("N")])]),
+       parse_pattern("[ -h ] [N]", O))
+  , ?_assertEqual(
+       required([optional(lists:reverse(O))]),
+       parse_pattern("[options]", O))
+  , ?_assertEqual(
+       required([argument("ADD")]),
+       parse_pattern("ADD", O))
+  , ?_assertEqual(
+       required([argument("<add>")]),
+       parse_pattern("<add>", O))
+  , ?_assertEqual(
+       required([command("add")]),
+       parse_pattern("add", O))
+  , ?_assertEqual(
+       required([required([either([HelpOpt,
+                                   required([VerboseOpt,
+                                             optional([argument("A")])])])])]),
+       parse_pattern("( -h | -v [ A ] )", O))
+  , ?_assertEqual(
+       required(
+         [required(
+            [either(
+               [required([argument("N"),
+                          optional([either([argument("M"),
+                                            required([either([argument("K"),
+                                                              argument("L")
+                                                             ])])])])]),
+                required([argument("O"), argument("P")])])])]),
+       parse_pattern("(N [M | (K | L)] | O P)", O))
+  ].
+
+argument(Arg)         -> #argument{name=Arg}.
+command(Cmd)          -> #command{name=Cmd}.
+required(Children)    -> #required{children=Children}.
+either(Children)      -> #either{children=Children}.
+optional(Children)    -> #optional{children=Children}.
+one_or_more(Children) -> #one_or_more{children=Children}.
+
+option(Short)           -> #option{short=Short}.
+option(Short, Long)     -> #option{short=Short, long=Long}.
+option(Short, Long, Ac) -> #option{short=Short, long=Long, argcount=Ac}.
+
 partition_test_() ->
   [ ?_assertEqual({"foobar", ""}     , partition("foobar"      , "abc"))
   , ?_assertEqual({"foo", "bar"}     , partition("foo bar"     , " "))
@@ -202,8 +442,7 @@ option_parse_test_() ->
   , ?_assertEqual(#option{long="--help"}, option_parse("--help"))
   , ?_assertEqual(#option{short="-h", long="--help"}, option_parse("-h --help"))
   , ?_assertEqual(#option{short="-h", long="--help"}, option_parse("--help -h"))
-  , ?_assertEqual(#option{short="-h", long="--help"},
-                  option_parse("-h, --help"))
+  , ?_assertEqual(#option{short="-h", long="--help"}, option_parse("-h,--help"))
 
   , ?_assertEqual(#option{short="-h", argcount=1}, option_parse("-h TOPIC"))
   , ?_assertEqual(#option{long="--help", argcount=1},
@@ -235,7 +474,7 @@ option_parse_test_() ->
   ].
 
 option_name_test_() ->
-  [ ?_assertEqual("-h", option_name(#option{short="-h"}))
+  [ ?_assertEqual("-h"    , option_name(#option{short="-h"}))
   , ?_assertEqual("--help", option_name(#option{short="-h", long="--help"}))
   , ?_assertEqual("--help", option_name(#option{long="--help"}))
   ].
