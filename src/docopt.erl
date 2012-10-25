@@ -62,14 +62,14 @@ parse_args(Args, Options) ->
              },
   parse_args_tokens(State).
 
-parse_args_tokens(#st{tokens=[]})                    -> [];
+parse_args_tokens(#st{tokens=[]}) -> [];
 parse_args_tokens(State0) ->
   case current(State0) of
     "--"           -> [#argument{value=Arg} || Arg <- tokens(State0)];
     [$-,$-|_]      ->
       {Opt, State} = parse_long(State0),
       Opt ++ parse_args_tokens(State);
-    [$-|_] ->
+    [$-|_]         ->
       {Opts, State} = parse_shorts(State0),
       Opts ++ parse_args_tokens(State);
     _              ->
