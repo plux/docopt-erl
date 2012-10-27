@@ -6,6 +6,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+%-define(DEBUG, true).
+
 %%%_* Records =================================================================
 
 -record(state, { options = [] :: [child_pattern()]
@@ -174,9 +176,9 @@ parse_expr(State0) ->
   end.
 
 parse_expr(State0, Acc)                 ->
-  ct:pal("in parse_expr: ~p, ~p", [tokens(State0), Acc]),
+  debug("in parse_expr: ~p, ~p", [tokens(State0), Acc]),
   {Seq, State} = parse_seq(State0),
-  ct:pal("in parse_expr after parse_seq: ~p, ~p", [tokens(State), Seq]),
+  debug("in parse_expr after parse_seq: ~p, ~p", [tokens(State), Seq]),
   case current(State) of
     "|" -> parse_expr(move(State), [maybe_required_seq(Seq)|Acc]);
     _   ->
@@ -197,9 +199,9 @@ parse_seq(#state{tokens=["]"|_]} = State, Acc) -> {lists:reverse(Acc), State};
 parse_seq(#state{tokens=[")"|_]} = State, Acc) -> {lists:reverse(Acc), State};
 parse_seq(#state{tokens=["|"|_]} = State, Acc) -> {lists:reverse(Acc), State};
 parse_seq(State0, Acc) ->
-  ct:pal("in parse seq: ~p, ~p", [tokens(State0), Acc]),
+  debug("in parse seq: ~p, ~p", [tokens(State0), Acc]),
   {Atom, State} = parse_atom(State0),
-  ct:pal("in parse seq after parse_atom: ~p, ~p, ~p", [Atom, tokens(State), Acc]),
+  debug("in parse seq after parse_atom: ~p, ~p, ~p", [Atom, tokens(State), Acc]),
   case current(State) of
     "..." -> parse_seq(move(State), [#one_or_more{children=Atom}|Acc]);
     _     -> parse_seq(State, Atom ++ Acc)
@@ -208,7 +210,7 @@ parse_seq(State0, Acc) ->
 %% atom ::= '(' expr ')' | '[' expr ']' | 'options'
 %%       | long | shorts | argument | command ;
 parse_atom(State) ->
-  ct:pal("in parse atom: ~p", [tokens(State)]),
+  debug("in parse atom: ~p", [tokens(State)]),
   case current(State) of
     "["       -> parse_optional(move(State));
     "("       -> parse_required(move(State));
@@ -223,18 +225,18 @@ parse_atom(State) ->
   end.
 
 parse_optional(State0) ->
-  ct:pal("parse optional ~p", [State0]),
+  debug("parse optional ~p", [State0]),
   {Expr, State} = parse_expr(State0),
-  ct:pal("parse optional after parse_expr ~p\n~p", [Expr, State]),
+  debug("parse optional after parse_expr ~p\n~p", [Expr, State]),
   case current(State) of
     "]" -> {[#optional{children=Expr}], move(State)};
     _   -> throw("Unmatched '['")
   end.
 
 parse_required(State0) ->
-  ct:pal("parse required ~p", [tokens(State0)]),
+  debug("parse required ~p", [tokens(State0)]),
   {Expr, State} = parse_expr(State0),
-  ct:pal("parse required after parse_expr ~p, ~p", [tokens(State), Expr]),
+  debug("parse required after parse_expr ~p, ~p", [tokens(State), Expr]),
   case current(State) of
     ")" -> {[#required{children=Expr}], move(State)};
     Res -> throw({"Unmatched '(':", Res})
@@ -278,6 +280,12 @@ partition(Str, Delim) ->
     0 -> {Str, ""};
     I -> {string:substr(Str, 1, I - 1), string:substr(Str, I + length(Delim))}
   end.
+
+-ifdef(DEBUG).
+debug(Fmt, Args) -> ct:pal(Fmt, Args).
+-else.
+debug(_Fmt, _Args) -> ok.
+-endif.
 
 %%%_* Tests ===================================================================
 
