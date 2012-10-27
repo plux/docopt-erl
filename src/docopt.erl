@@ -124,7 +124,11 @@ parse_shorts(State) ->
 parse_shorts([], State, Acc) -> {lists:reverse(Acc), State};
 parse_shorts([H|T], State, Acc) ->
  case [O || O <- options(State), tl(O#option.short) == [H]] of
-   []                       -> throw({[$-, H], "not recognized", State});
+   [] when State#state.mode == parse_args ->
+     throw({[$-, H], "not recognized", State});
+   [] when State#state.mode == parse_pattern ->
+     Opt = #option{short=[$-, H]},
+     parse_shorts(T, #state{options=[Opt|options(State)]}, [Opt|Acc]);
    Opt when length(Opt) > 1 -> throw({[$-, H], "specified ambiguously"});
    [Opt] when Opt#option.argcount == 0 ->
      parse_shorts(T, State, [Opt#option{value = true}|Acc]);
