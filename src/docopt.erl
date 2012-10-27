@@ -81,21 +81,27 @@ move(#state{tokens=[_|Rest]}=St)    -> St#state{tokens=Rest}.
 tokens(#state{tokens=Tokens})       -> Tokens.
 rest(#state{tokens=[_|Rest]})       -> Rest.
 options(#state{options=Options})    -> Options.
+mode(#state{mode=Mode})             -> Mode.
 
 parse_long(State0) ->
   {Raw, Value} = partition(current(State0), "="),
-  Opt =
-    case [O || O <- options(State0), O#option.long == Raw] of
-      [O] -> O;
-      []  ->
-        case [O || O <- options(State0), starts_with(O#option.long, Raw)] of
-          []                         -> throw({Raw, "not recognized"});
-          Opts when length(Opts) > 1 -> throw({Raw, "is not a unique prefix"});
-          [O]                        -> O
-        end
-    end,
-  Rest  = rest(State0),
-  State = move(State0),
+  Opt0 = lists:filter(fun (#option{long=Long}) ->
+                          Long == Raw orelse (mode(State0) == parse_args
+                                              andalso starts_with(Long, Raw))
+                      end, options(State0)),
+  {Opt, State} = case {mode(State0), Opt0} of
+                   {parse_pattern, []} ->
+                     Argcount = case Value == [] of
+                                  true  -> 0;
+                                  false -> 1
+                                end,
+                     O = #option{long=Raw, argcount=Argcount},
+                     {O, move(#state{options=[O|options(State0)]})};
+                   {parse_args, []} -> throw({Raw, "not recognized"});
+                   {_, [O]} -> {O, move(State0)};
+                   {_, _}   -> throw({Raw, "is not a unique prefix"})
+                 end,
+  Rest = tokens(State),
   case Opt#option.argcount of
     1 when Value == [],
            Rest  == [] -> throw({Raw, "requires an argument"});
