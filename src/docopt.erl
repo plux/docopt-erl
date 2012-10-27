@@ -8,10 +8,10 @@
 
 %%%_* Records =================================================================
 
--record(st, { options = [] :: [child_pattern()]
-            , tokens  = [] :: [string()]
-            , mode         :: parse_mode()
-            }).
+-record(state, { options = [] :: [child_pattern()]
+               , tokens  = [] :: [string()]
+               , mode         :: parse_mode()
+               }).
 
 %% Parent patterns
 -record(one_or_more , {children :: [pattern()]}).
@@ -56,13 +56,12 @@ parse_doc_options(Doc) ->
   [option_parse("-" ++ S) || S <- OptStrings].
 
 parse_args(Args, Options) ->
-  State = #st{ tokens  = string:tokens(Args, " ")
-             , options = Options
-             , mode    = parse_args
-             },
+  State = #state{ tokens  = string:tokens(Args, " ")
+                , options = Options
+                , mode    = parse_args
+                },
   parse_args_tokens(State).
 
-parse_args_tokens(#st{tokens=[]}) -> [];
 parse_args_tokens(State0) ->
   case current(State0) of
     "--"           -> [#argument{value=Arg} || Arg <- tokens(State0)];
@@ -71,17 +70,18 @@ parse_args_tokens(State0) ->
       Opt ++ parse_args_tokens(State);
     [$-|_]         ->
       {Opts, State} = parse_shorts(State0),
+parse_args_tokens(#state{tokens=[]}) -> [];
       Opts ++ parse_args_tokens(State);
     _              ->
       [#argument{value=current(State0)}|parse_args_tokens(move(State0))]
   end.
 
-current(#st{tokens=[Current|_]}) -> Current;
-current(#st{tokens=[]})          -> undefined.
-move(#st{tokens=[_|Rest]}=St)    -> St#st{tokens=Rest}.
-tokens(#st{tokens=Tokens})       -> Tokens.
-rest(#st{tokens=[_|Rest]})       -> Rest.
-options(#st{options=Options})    -> Options.
+current(#state{tokens=[Current|_]}) -> Current;
+current(#state{tokens=[]})          -> undefined.
+move(#state{tokens=[_|Rest]}=St)    -> St#state{tokens=Rest}.
+tokens(#state{tokens=Tokens})       -> Tokens.
+rest(#state{tokens=[_|Rest]})       -> Rest.
+options(#state{options=Options})    -> Options.
 
 parse_long(State0) ->
   {Raw, Value} = partition(current(State0), "="),
@@ -153,10 +153,10 @@ parse_pattern(Source0, Options) ->
   %% Add spaces around []()| and ...
   Source = re:replace(Source0, "([\\[\\]\\(\\)\\|]|\\.\\.\\.)", " \\1 ",
                       [{return, list}, global]),
-  State = #st{ tokens  = string:tokens(Source, " ")
-             , options = Options
-             , mode    = parse_pattern
-             },
+  State = #state{ tokens  = string:tokens(Source, " ")
+                , options = Options
+                , mode    = parse_pattern
+                },
   {Result, _} = parse_expr(State),
   #required{children=Result}.
 
@@ -188,10 +188,10 @@ maybe_required_seq(Seq)   -> #required{children=Seq}.
 %% seq ::= ( atom [ '...' ] )* ;
 parse_seq(State) -> parse_seq(State, []).
 
-parse_seq(#st{tokens=[]}      = State, Acc) -> {lists:reverse(Acc), State};
-parse_seq(#st{tokens=["]"|_]} = State, Acc) -> {lists:reverse(Acc), State};
-parse_seq(#st{tokens=[")"|_]} = State, Acc) -> {lists:reverse(Acc), State};
-parse_seq(#st{tokens=["|"|_]} = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(#state{tokens=[]}      = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(#state{tokens=["]"|_]} = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(#state{tokens=[")"|_]} = State, Acc) -> {lists:reverse(Acc), State};
+parse_seq(#state{tokens=["|"|_]} = State, Acc) -> {lists:reverse(Acc), State};
 parse_seq(State0, Acc) ->
   ct:pal("in parse seq: ~p, ~p", [tokens(State0), Acc]),
   {Atom, State} = parse_atom(State0),
@@ -292,9 +292,9 @@ parse_atom_test_() ->
       , #option{short="-f", long="--file", argcount=1}
       ],
   St = fun(Tokens) ->
-           #st{ options = O
-              , tokens  = Tokens
-              , mode    = parse_pattern}
+           #state{ options = O
+                 , tokens  = Tokens
+                 , mode    = parse_pattern}
        end,
   [ ?_assertEqual({[#argument{name="FOO"}], St([])},
                   parse_atom(St(["FOO"])))
