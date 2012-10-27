@@ -118,8 +118,8 @@ starts_with(Str, SubStr) when is_list(Str), is_list(SubStr) ->
 starts_with(_, _) -> false.
 
 parse_shorts(State) ->
-  [$-|Tokens] = current(State),
-  parse_shorts(Tokens, move(State), []).
+  [$-|Str] = current(State),
+  parse_shorts(Str, move(State), []).
 
 parse_shorts([], State, Acc) -> {lists:reverse(Acc), State};
 parse_shorts([H|T], State, Acc) ->
