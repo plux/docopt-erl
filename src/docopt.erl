@@ -32,7 +32,6 @@
 
 -type pattern() :: child_pattern() | parent_pattern().
 
-%% Types
 -type child_pattern()  :: #command{}
                         | #argument{}
                         | #option{}.
