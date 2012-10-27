@@ -61,17 +61,17 @@ parse_args(Args, Options) ->
                 },
   parse_args_tokens(State).
 
+parse_args_tokens(#state{tokens=[]}) -> [];
 parse_args_tokens(State0) ->
   case current(State0) of
-    "--"           -> [#argument{value=Arg} || Arg <- tokens(State0)];
-    [$-,$-|_]      ->
-      {Opt, State} = parse_long(State0),
-      Opt ++ parse_args_tokens(State);
-    [$-|_]         ->
-      {Opts, State} = parse_shorts(State0),
-parse_args_tokens(#state{tokens=[]}) -> [];
+    "--"      -> [#argument{value=Arg} || Arg <- tokens(State0)];
+    [$-,$-|_] ->
+      {Opts, State} = parse_long(State0),
       Opts ++ parse_args_tokens(State);
-    _              ->
+    [$-|_]    ->
+      {Opts, State} = parse_shorts(State0),
+      Opts ++ parse_args_tokens(State);
+    _         ->
       [#argument{value=current(State0)}|parse_args_tokens(move(State0))]
   end.
 
@@ -174,10 +174,9 @@ parse_expr(State0, Acc)                 ->
   case current(State) of
     "|" -> parse_expr(move(State), [maybe_required_seq(Seq)|Acc]);
     _   ->
-      Result = lists:reverse([maybe_required_seq(Seq)|Acc]),
-      case length(Result) > 1 of
-        true  -> {[#either{children=Result}], State};
-        false -> {Result, State} % Needed?
+      case lists:reverse([maybe_required_seq(Seq)|Acc]) of
+        Result when length(Result) > 1 -> {[#either{children=Result}], State};
+        Result                         -> {Result, State} % Needed?
       end
    end.
 
@@ -212,10 +211,8 @@ parse_atom(State) ->
     [$-|_]    -> parse_shorts(State);
     Current   ->
       case is_arg(Current) of
-        true  ->
-          ct:pal("returning argument: ~p, ~p", [Current, tokens(State)]),
-          {[#argument{name=Current}], move(State)};
-        false -> {[#command{name=Current}], move(State)}
+        true  -> {[#argument{name=Current}], move(State)};
+        false -> {[#command{name=Current}] , move(State)}
       end
   end.
 
@@ -255,18 +252,14 @@ is_arg(S) ->
 
 option_parse(Str) ->
   {Options, Desc} = partition(string:strip(Str), "  "),
-  ParsedOpt = lists:foldl(fun([$-,$-|_] = S, Opt) -> Opt#option{long     = S};
-                             ([$-|_]    = S, Opt) -> Opt#option{short    = S};
-                             (_            , Opt) -> Opt#option{argcount = 1}
-                          end, #option{}, string:tokens(Options, ",= ")),
-  case ParsedOpt of
-    #option{argcount = 1} -> ParsedOpt#option{value = default_value(Desc)};
-    ParsedOpt             -> ParsedOpt
-  end.
+  lists:foldl(fun([$-,$-|_] = S, Opt) -> Opt#option{long  = S};
+                 ([$-|_]    = S, Opt) -> Opt#option{short = S};
+                 (_            , Opt) ->
+                  Opt#option{argcount = 1, value = default_value(Desc)}
+              end, #option{}, string:tokens(Options, ",= ")).
 
 default_value(Desc) ->
-  {ok, Re} = re:compile("\\[default: (.*)\\]", [caseless]),
-  case re:run(Desc, Re, [{capture, [1], list}]) of
+  case re:run(Desc,"\\[default: (.*)\\]", [{capture, [1], list}, caseless]) of
     {match, [DefaultValue]} -> DefaultValue;
     nomatch                 -> false
   end.
@@ -277,10 +270,7 @@ option_name(#option{long=Long})                   -> Long.
 partition(Str, Delim) ->
   case string:str(Str, Delim) of
     0 -> {Str, ""};
-    I ->
-      Left  = string:substr(Str, 1, I - 1),
-      Right = string:substr(Str, I + length(Delim)),
-      {Left, Right}
+    I -> {string:substr(Str, 1, I - 1), string:substr(Str, I + length(Delim))}
   end.
 
 %%%_* Tests ===================================================================
