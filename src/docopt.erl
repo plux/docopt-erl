@@ -354,6 +354,20 @@ match_fun(#command{name=Name}) ->
      (_)                    -> false
   end.
 
+partition(Str, Delim) ->
+  case string:str(Str, Delim) of
+    0 -> {Str, ""};
+    I -> {string:substr(Str, 1, I - 1), string:substr(Str, I + length(Delim))}
+  end.
+
+-ifdef(DEBUG).
+debug(Fmt, Args) -> ct:pal(Fmt, Args).
+-else.
+debug(_Fmt, _Args) -> ok.
+-endif.
+
+%%%_* Tests ===================================================================
+
 match_option_test_() ->
   A  = opt("-a"),
   AT = A#option{value = true},
@@ -436,20 +450,6 @@ match_either_test_() ->
   , ?_assertEqual({true , []  , [AN1, AM2]},
                   match(either([AM, req([AN, AM])]), [A1, A2]))
   ].
-
-partition(Str, Delim) ->
-  case string:str(Str, Delim) of
-    0 -> {Str, ""};
-    I -> {string:substr(Str, 1, I - 1), string:substr(Str, I + length(Delim))}
-  end.
-
--ifdef(DEBUG).
-debug(Fmt, Args) -> ct:pal(Fmt, Args).
--else.
-debug(_Fmt, _Args) -> ok.
--endif.
-
-%%%_* Tests ===================================================================
 
 parse_atom_test_() ->
   O = [ #option{short="-h"}
