@@ -298,7 +298,9 @@ is_arg(S) ->
 %%   , ?_assertEqual([{"A", "arg"}, {"-v", false}, {"-q", true}],
 %%                   docopt(Doc, "-q arg"))
 %%   ].
-match(Pat, Rest) -> match(Pat, Rest, []).
+match(Pat, Rest) ->
+  {Bool, R, A} = match(Pat, Rest, []),
+  {Bool, R, lists:reverse(A)}.
 
 match(#optional{}=Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
 match(#required{}=Pat, Rest, Acc) -> match_required(Pat, Rest, Acc);
