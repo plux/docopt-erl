@@ -286,18 +286,6 @@ parse_required(State0) ->
 is_arg(S) ->
   (hd(S) == $< andalso lists:last(S) == $>) orelse string:to_upper(S) == S.
 
-%% docopt_any_options_test_() ->
-%%   Doc = "Usage: prog [options] A
-
-%%     -q  Be quiet
-%%     -v  Be verbose.",
-%%   [ ?_assertEqual([{"A", "arg"}, {"-v", false}, {"-q", false}],
-%%                   docopt(Doc, "arg"))
-%%   , ?_assertEqual([{"A", "arg"}, {"-v", true}, {"-q", false}],
-%%                   docopt(Doc, "-v arg"))
-%%   , ?_assertEqual([{"A", "arg"}, {"-v", false}, {"-q", true}],
-%%                   docopt(Doc, "-q arg"))
-%%   ].
 match(Pat, Rest) ->
   {Bool, R, A} = match(Pat, Rest, []),
   {Bool, R, lists:reverse(A)}.
