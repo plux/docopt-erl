@@ -51,6 +51,9 @@ docopt(Doc, Args) ->
   Options = parse_doc_options(Doc),
   Args    = parse_args(Args, Options),
   [{option_name(Opt), Opt#option.value} || Opt <- Options].
+
+fix(X) -> X. %% TODO
+
 flatten(#required{children=Children})    -> flatten_children(Children);
 flatten(#either{children=Children})      -> flatten_children(Children);
 flatten(#one_or_more{children=Children}) -> flatten_children(Children);
