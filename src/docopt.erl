@@ -319,13 +319,14 @@ match_either(#either{children=Children}, Rest0, Acc0) ->
                          end, [], Children),
   case lists:reverse(Outcomes) of
     []    -> {false, Rest0, Acc0};
-    [H|T] ->
-      {true, R, A} = lists:foldl(fun most_consumed/2, H, T),
-      {true, R, lists:reverse(A)}
+    [H|T] -> {true, R, A} = lists:foldl(fun most_consumed/2, H, T)
   end.
 
 most_consumed({_, R, _}=Res, {_, Min, _}) when length(R) < length(Min) -> Res;
-most_consumed({_, _, _}    , Acc)                                      -> Acc.
+most_consumed({_, _, _}   , Acc)                                      -> Acc.
+
+match_one_or_more(#one_or_more{children=Children}, Rest0, Acc0) ->
+  todo.
 
 match_child_pattern(Pat, Rest0, Acc) ->
   case single_match(Pat, Rest0) of
