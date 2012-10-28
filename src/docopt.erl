@@ -98,7 +98,7 @@ parse_long(State0) ->
                                   false -> 1
                                 end,
                      O = #option{long=Raw, argcount=Argcount},
-                     {O, move(#state{options=[O|options(State0)]})};
+                     {O, move(State0#state{options=[O|options(State0)]})};
                    {parse_args, []} -> throw({Raw, "not recognized"});
                    {_, [O]} -> {O, move(State0)};
                    {_, _}   -> throw({Raw, "is not a unique prefix"})
@@ -127,8 +127,9 @@ parse_shorts([H|T], State, Acc) ->
    [] when State#state.mode == parse_args ->
      throw({[$-, H], "not recognized", State});
    [] when State#state.mode == parse_pattern ->
-     Opt = #option{short=[$-, H]},
-     parse_shorts(T, #state{options=[Opt|options(State)]}, [Opt|Acc]);
+     %% TODO: What about value here? Probably needs to parse value...
+     Opt = #option{short=[$-, H], value=true},
+     parse_shorts(T, State#state{options=[Opt|options(State)]}, [Opt|Acc]);
    Opt when length(Opt) > 1 -> throw({[$-, H], "specified ambiguously"});
    [Opt] when Opt#option.argcount == 0 ->
      parse_shorts(T, State, [Opt#option{value = true}|Acc]);
