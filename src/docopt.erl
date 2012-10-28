@@ -51,6 +51,16 @@ docopt(Doc, Args) ->
   Options = parse_doc_options(Doc),
   Args    = parse_args(Args, Options),
   [{option_name(Opt), Opt#option.value} || Opt <- Options].
+flatten(#required{children=Children})    -> flatten_children(Children);
+flatten(#either{children=Children})      -> flatten_children(Children);
+flatten(#one_or_more{children=Children}) -> flatten_children(Children);
+flatten(#optional{children=Children})    -> flatten_children(Children);
+flatten(#command{}=Cmd)                  -> [Cmd];
+flatten(#option{}=Opt)                   -> [Opt];
+flatten(#argument{}=Arg)                 -> [Arg].
+
+flatten_children(Children) ->
+  lists:flatten(lists:map(fun flatten/1, Children)).
 
 parse_doc_options(Doc) ->
   [_|OptStrings] = re:split(Doc, "^ *-|\\n *-", [{return, list}]),
