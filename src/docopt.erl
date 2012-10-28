@@ -280,6 +280,81 @@ default_value(Desc) ->
 option_name(#option{long=undefined, short=Short}) -> Short;
 option_name(#option{long=Long})                   -> Long.
 
+match(Pat, Rest) -> match(Pat, Rest, []).
+
+match(Pat            , Rest, Acc) -> match_child_pattern(Pat, Rest, Acc).
+
+match_child_pattern(Pat, Rest0, Acc) ->
+  case single_match(Pat, Rest0) of
+    nomatch              -> {false, Rest0, Acc};
+    {match, Match, Rest} ->
+      %% SameName = lists:filter(match_fun(Pat), Rest0)
+      %% TODO: Add increment stuff here... BLEH
+      {true, Rest, [Match|Acc]}
+  end.
+
+single_match(Pat, Rest) ->
+  case lists:filter(match_fun(Pat), Rest) of
+    []        -> nomatch;
+    [Match|_] -> {match, match_result(Pat, Match), lists:delete(Match, Rest)}
+  end.
+
+match_result(#option{}   = Opt, Match) ->
+  Opt#option{value=Match#option.value};
+match_result(#argument{} = Arg, Match) ->
+  Arg#argument{value=Match#argument.value};
+match_result(#command{}  = Cmd, _Match) ->
+  Cmd#command{value=true}.
+
+match_fun(#option{}=Opt) ->
+  fun(#option{}=O) -> option_name(O) == option_name(Opt);
+     (_)           -> false
+  end;
+match_fun(#argument{}) ->
+  fun(#argument{}) -> true;
+     (_)           -> false
+  end;
+match_fun(#command{name=Name}) ->
+  fun(#argument{value=Arg}) -> Arg == Name;
+     (_)                    -> false
+  end.
+
+option_match_test_() ->
+  A  = opt("-a"),
+  AT = A#option{value = true},
+  X  = opt("-x"),
+  N  = arg("N"),
+  [ ?_assertEqual({true , []    , [AT]}, match(A, [AT]))
+  , ?_assertEqual({false, [X]   , []}  , match(A, [X]))
+  , ?_assertEqual({false, [N]   , []}  , match(A, [N]))
+  , ?_assertEqual({true , [X, N], [A]} , match(A, [X, A, N]))
+  , ?_assertEqual({true , [A]   , [AT]}, match(A, [AT, A]))
+  ].
+
+argument_match_test_() ->
+  A  = arg("V"),
+  AV = arg("V", 9),
+  V  = arg(undefined, 9),
+  V0 = arg(undefined, 0),
+  OX = opt("-x"),
+  OA = opt("-a"),
+  [ ?_assertEqual({true , []      , [AV]}, match(A, [AV]))
+  , ?_assertEqual({false, [OX]    , []}  , match(A, [OX]))
+  , ?_assertEqual({true , [OX, OA], [AV]}, match(A, [OX, OA, V]))
+  , ?_assertEqual({true , [V0]    , [AV]}, match(A, [V, V0]))
+  ].
+
+command_match_test_() ->
+  C  = cmd("c"),
+  A  = arg(undefined, "c"),
+  CT = cmd("c", true),
+  OX = opt("-x"),
+  OA = opt("-a"),
+  [ ?_assertEqual({true , []      , [CT]}, match(C, [A]))
+  , ?_assertEqual({false, [OX]    , []}  , match(C, [OX]))
+  , ?_assertEqual({true , [OX, OA], [CT]}, match(C, [OX, OA, A]))
+    %% Either...
+  ].
 partition(Str, Delim) ->
   case string:str(Str, Delim) of
     0 -> {Str, ""};
