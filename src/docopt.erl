@@ -283,12 +283,22 @@ option_name(#option{long=Long})                   -> Long.
 match(Pat, Rest) -> match(Pat, Rest, []).
 
 match(#optional{}=Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
+match(#required{}=Pat, Rest, Acc) -> match_required(Pat, Rest, Acc);
 match(Pat            , Rest, Acc) -> match_child_pattern(Pat, Rest, Acc).
 
 match_optional(#optional{children=Children}, Rest0, Acc0) ->
   lists:foldl(fun(Pat, {true, R, A}) ->
                   {_, Rest, Acc} = match(Pat, R, A),
                   {true, Rest, Acc}
+              end, {true, Rest0, Acc0}, Children).
+
+match_required(#required{children=Children}, Rest0, Acc0) ->
+  lists:foldl(fun(Pat, {true, R, A}) ->
+                  case match(Pat, R, A) of
+                    {true , _, _} = Res -> Res;
+                    {false, _, _}       -> {false, Rest0, Acc0}
+                  end;
+                 (_, {false, _, _}) -> {false, Rest0, Acc0}
               end, {true, Rest0, Acc0}, Children).
 
 match_child_pattern(Pat, Rest0, Acc) ->
@@ -379,6 +389,15 @@ match_optional_test_() ->
   , ?_assertEqual({true, []  , [AV]}, match(optional([A])     , [V]))
   , ?_assertEqual({true, [OX], [OB, OA]},
                   match(optional([OA, OB]), [OB, OX, OA]))
+  ].
+
+match_required_test_() ->
+  A = opt("-a"),
+  X = opt("-x"),
+  [ ?_assertEqual({true , [] , [A]}, match(req([A])   , [A]))
+  , ?_assertEqual({false, [] , []} , match(req([A])   , []))
+  , ?_assertEqual({false, [X], []} , match(req([A])   , [X]))
+  , ?_assertEqual({false, [A], []} , match(req([A, X]), [A]))
   ].
 
 partition(Str, Delim) ->
