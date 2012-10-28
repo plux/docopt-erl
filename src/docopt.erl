@@ -22,8 +22,8 @@
 -record(either      , {children :: [pattern()]}).
 
 %% Child patterns
--record(command  , {name :: string(), value :: any()}).
--record(argument , {name :: string(), value :: any()}).
+-record(command  , {name :: string(), value = false :: any()}).
+-record(argument , {name :: string(), value = false :: any()}).
 -record(option   , { short            :: string()
                    , long             :: string()
                    , argcount = 0     :: non_neg_integer()
