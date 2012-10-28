@@ -440,8 +440,8 @@ match_option_test_() ->
 match_argument_test_() ->
   A  = arg("V"),
   AV = arg("V", 9),
-  V  = arg(undefined, 9),
-  V0 = arg(undefined, 0),
+  V  = arg(9),
+  V0 = arg(0),
   OX = opt("-x"),
   OA = opt("-a"),
   [ ?_assertEqual({true , []      , [AV]}, match(A, [AV]))
@@ -452,13 +452,16 @@ match_argument_test_() ->
 
 match_command_test_() ->
   C  = cmd("c"),
-  A  = arg(undefined, "c"),
+  AC = arg(undefined, "c"),
   CT = cmd("c", true),
   OX = opt("-x"),
   OA = opt("-a"),
-  [ ?_assertEqual({true , []      , [CT]}, match(C, [A]))
+  [ ?_assertEqual({true , []      , [CT]}, match(C, [AC]))
   , ?_assertEqual({false, [OX]    , []}  , match(C, [OX]))
-  , ?_assertEqual({true , [OX, OA], [CT]}, match(C, [OX, OA, A]))
+  , ?_assertEqual({true , [OX, OA], [CT]}, match(C, [OX, OA, AC]))
+  , ?_assertEqual({true, [], [cmd("rm", true)]},
+                  match(either([cmd("add"), cmd("rm")]),
+                        [arg(undefined, "rm")]))
     %% Either...
   ].
 
@@ -468,7 +471,7 @@ match_optional_test_() ->
   OX = opt("-x"),
   A  = arg("A"),
   AV = arg("A", 9),
-  V  = arg(undefined, 9),
+  V  = arg(9),
   [ ?_assertEqual({true, []  , [OA]}, match(optional([OA])    , [OA]))
   , ?_assertEqual({true, []  , []}  , match(optional([OA])    , []))
   , ?_assertEqual({true, [OX], []}  , match(optional([OA])    , [OX]))
@@ -476,7 +479,7 @@ match_optional_test_() ->
   , ?_assertEqual({true, []  , [OB]}, match(optional([OA, OB]), [OB]))
   , ?_assertEqual({true, [OX], []}  , match(optional([OA, OB]), [OX]))
   , ?_assertEqual({true, []  , [AV]}, match(optional([A])     , [V]))
-  , ?_assertEqual({true, [OX], [OB, OA]},
+  , ?_assertEqual({true, [OX], [OA, OB]},
                   match(optional([OA, OB]), [OB, OX, OA]))
   ].
 
@@ -496,8 +499,8 @@ match_either_test_() ->
   OX  = opt("-x"),
   AN  = arg("N"),
   AM  = arg("M"),
-  A1  = arg(undefined, 1),
-  A2  = arg(undefined, 2),
+  A1  = arg(1),
+  A2  = arg(2),
   AN1 = arg("N", 1),
   AM2 = arg("M", 2),
   [ ?_assertEqual({true , []  , [OA]}, match(either([OA, OB])    , [OA]))
@@ -638,7 +641,8 @@ parse_pattern_test_() ->
        parse_pattern("(N [M | (K | L)] | O P)", O))
   ].
 
-arg(Arg)              -> #argument{name=Arg}.
+arg(A) when is_list(A) -> #argument{name=A};
+arg(V)                 -> #argument{value=V}.
 arg(Arg, Value)       -> #argument{name=Arg, value=Value}.
 cmd(Cmd)              -> #command{name=Cmd}.
 cmd(Cmd, Value)       -> #command{name=Cmd, value=Value}.
