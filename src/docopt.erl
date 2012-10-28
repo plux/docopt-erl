@@ -326,7 +326,7 @@ match_fun(#command{name=Name}) ->
      (_)                    -> false
   end.
 
-option_match_test_() ->
+match_option_test_() ->
   A  = opt("-a"),
   AT = A#option{value = true},
   X  = opt("-x"),
@@ -338,7 +338,7 @@ option_match_test_() ->
   , ?_assertEqual({true , [A]   , [AT]}, match(A, [AT, A]))
   ].
 
-argument_match_test_() ->
+match_argument_test_() ->
   A  = arg("V"),
   AV = arg("V", 9),
   V  = arg(undefined, 9),
@@ -351,7 +351,7 @@ argument_match_test_() ->
   , ?_assertEqual({true , [V0]    , [AV]}, match(A, [V, V0]))
   ].
 
-command_match_test_() ->
+match_command_test_() ->
   C  = cmd("c"),
   A  = arg(undefined, "c"),
   CT = cmd("c", true),
@@ -363,7 +363,7 @@ command_match_test_() ->
     %% Either...
   ].
 
-optional_match_test_() ->
+match_optional_test_() ->
   OA = opt("-a"),
   OB = opt("-b"),
   OX = opt("-x"),
