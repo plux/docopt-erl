@@ -290,10 +290,11 @@ match(Pat, Rest) ->
   {Bool, R, A} = match(Pat, Rest, []),
   {Bool, R, lists:reverse(A)}.
 
-match(#optional{}=Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
-match(#required{}=Pat, Rest, Acc) -> match_required(Pat, Rest, Acc);
-match(#either{}  =Pat, Rest, Acc) -> match_either(Pat, Rest, Acc);
-match(Pat            , Rest, Acc) -> match_child_pattern(Pat, Rest, Acc).
+match(#optional{}    = Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
+match(#required{}    = Pat, Rest, Acc) -> match_required(Pat, Rest, Acc);
+match(#either{}      = Pat, Rest, Acc) -> match_either(Pat, Rest, Acc);
+match(#one_or_more{} = Pat, Rest, Acc) -> match_one_or_more(Pat, Rest, Acc);
+match(                 Pat, Rest, Acc) -> match_child_pattern(Pat, Rest, Acc).
 
 match_optional(#optional{children=Children}, Rest0, Acc0) ->
   lists:foldl(fun(Pat, {true, R, A}) ->
