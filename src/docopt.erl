@@ -62,6 +62,15 @@ flatten(#argument{}=Arg)                 -> [Arg].
 flatten_children(Children) ->
   lists:flatten(lists:map(fun flatten/1, Children)).
 
+name(#command{name=Name})                 -> Name;
+name(#argument{name=Name})                -> Name;
+name(#option{long=undefined, short=Name}) -> Name;
+name(#option{long=Name})                  -> Name.
+
+value(#command{value=Value})  -> Value;
+value(#argument{value=Value}) -> Value;
+value(#option{value=Value})   -> Value.
+
 parse_doc_options(Doc) ->
   [_|OptStrings] = re:split(Doc, "^ *-|\\n *-", [{return, list}]),
   [option_parse("-" ++ S) || S <- OptStrings].
@@ -287,8 +296,6 @@ default_value(Desc) ->
     nomatch                 -> false
   end.
 
-option_name(#option{long=undefined, short=Short}) -> Short;
-option_name(#option{long=Long})                   -> Long.
 
 match(Pat, Rest) -> match(Pat, Rest, []).
 
@@ -352,7 +359,7 @@ match_result(#command{}  = Cmd, _Match) ->
   Cmd#command{value=true}.
 
 match_fun(#option{}=Opt) ->
-  fun(#option{}=O) -> option_name(O) == option_name(Opt);
+  fun(#option{}=O) -> name(O) == name(Opt);
      (_)           -> false
   end;
 match_fun(#argument{}) ->
