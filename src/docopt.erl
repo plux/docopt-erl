@@ -282,7 +282,14 @@ option_name(#option{long=Long})                   -> Long.
 
 match(Pat, Rest) -> match(Pat, Rest, []).
 
+match(#optional{}=Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
 match(Pat            , Rest, Acc) -> match_child_pattern(Pat, Rest, Acc).
+
+match_optional(#optional{children=Children}, Rest0, Acc0) ->
+  lists:foldl(fun(Pat, {true, R, A}) ->
+                  {_, Rest, Acc} = match(Pat, R, A),
+                  {true, Rest, Acc}
+              end, {true, Rest0, Acc0}, Children).
 
 match_child_pattern(Pat, Rest0, Acc) ->
   case single_match(Pat, Rest0) of
@@ -355,6 +362,25 @@ command_match_test_() ->
   , ?_assertEqual({true , [OX, OA], [CT]}, match(C, [OX, OA, A]))
     %% Either...
   ].
+
+optional_match_test_() ->
+  OA = opt("-a"),
+  OB = opt("-b"),
+  OX = opt("-x"),
+  A  = arg("A"),
+  AV = arg("A", 9),
+  V  = arg(undefined, 9),
+  [ ?_assertEqual({true, []  , [OA]}, match(optional([OA])    , [OA]))
+  , ?_assertEqual({true, []  , []}  , match(optional([OA])    , []))
+  , ?_assertEqual({true, [OX], []}  , match(optional([OA])    , [OX]))
+  , ?_assertEqual({true, []  , [OA]}, match(optional([OA, OB]), [OA]))
+  , ?_assertEqual({true, []  , [OB]}, match(optional([OA, OB]), [OB]))
+  , ?_assertEqual({true, [OX], []}  , match(optional([OA, OB]), [OX]))
+  , ?_assertEqual({true, []  , [AV]}, match(optional([A])     , [V]))
+  , ?_assertEqual({true, [OX], [OB, OA]},
+                  match(optional([OA, OB]), [OB, OX, OA]))
+  ].
+
 partition(Str, Delim) ->
   case string:str(Str, Delim) of
     0 -> {Str, ""};
