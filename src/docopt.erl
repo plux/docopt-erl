@@ -78,6 +78,20 @@ parse_doc_options(Doc) ->
   [_|OptStrings] = re:split(Doc, "^ *-|\\n *-", [{return, list}]),
   [option_parse("-" ++ S) || S <- OptStrings].
 
+option_parse(Str) ->
+  {Options, Desc} = partition(string:strip(Str), "  "),
+  lists:foldl(fun([$-,$-|_] = S, Opt) -> Opt#option{long  = S};
+                 ([$-|_]    = S, Opt) -> Opt#option{short = S};
+                 (_            , Opt) ->
+                  Opt#option{argcount = 1, value = default_value(Desc)}
+              end, #option{}, string:tokens(Options, ",= ")).
+
+default_value(Desc) ->
+  case re:run(Desc,"\\[default: (.*)\\]", [{capture, [1], list}, caseless]) of
+    {match, [DefaultValue]} -> DefaultValue;
+    nomatch                 -> false
+  end.
+
 parse_args(Args, Options) ->
   State = #state{ tokens  = string:tokens(Args, " ")
                 , options = Options
@@ -284,22 +298,6 @@ is_arg(S) ->
 %%   , ?_assertEqual([{"A", "arg"}, {"-v", false}, {"-q", true}],
 %%                   docopt(Doc, "-q arg"))
 %%   ].
-
-option_parse(Str) ->
-  {Options, Desc} = partition(string:strip(Str), "  "),
-  lists:foldl(fun([$-,$-|_] = S, Opt) -> Opt#option{long  = S};
-                 ([$-|_]    = S, Opt) -> Opt#option{short = S};
-                 (_            , Opt) ->
-                  Opt#option{argcount = 1, value = default_value(Desc)}
-              end, #option{}, string:tokens(Options, ",= ")).
-
-default_value(Desc) ->
-  case re:run(Desc,"\\[default: (.*)\\]", [{capture, [1], list}, caseless]) of
-    {match, [DefaultValue]} -> DefaultValue;
-    nomatch                 -> false
-  end.
-
-
 match(Pat, Rest) -> match(Pat, Rest, []).
 
 match(#optional{}=Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
