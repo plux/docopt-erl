@@ -284,6 +284,7 @@ match(Pat, Rest) -> match(Pat, Rest, []).
 
 match(#optional{}=Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
 match(#required{}=Pat, Rest, Acc) -> match_required(Pat, Rest, Acc);
+match(#either{}  =Pat, Rest, Acc) -> match_either(Pat, Rest, Acc);
 match(Pat            , Rest, Acc) -> match_child_pattern(Pat, Rest, Acc).
 
 match_optional(#optional{children=Children}, Rest0, Acc0) ->
@@ -300,6 +301,23 @@ match_required(#required{children=Children}, Rest0, Acc0) ->
                   end;
                  (_, {false, _, _}) -> {false, Rest0, Acc0}
               end, {true, Rest0, Acc0}, Children).
+
+match_either(#either{children=Children}, Rest0, Acc0) ->
+  Outcomes = lists:foldl(fun(Pat, Acc) ->
+                             case match(Pat, Rest0, Acc0) of
+                               {true , _, _} = Res -> [Res|Acc];
+                               {false, _, _}       -> Acc
+                             end
+                         end, [], Children),
+  case lists:reverse(Outcomes) of
+    []    -> {false, Rest0, Acc0};
+    [H|T] ->
+      {true, R, A} = lists:foldl(fun most_consumed/2, H, T),
+      {true, R, lists:reverse(A)}
+  end.
+
+most_consumed({_, R, _}=Res, {_, Min, _}) when length(R) < length(Min) -> Res;
+most_consumed({_, _, _}    , Acc)                                      -> Acc.
 
 match_child_pattern(Pat, Rest0, Acc) ->
   case single_match(Pat, Rest0) of
@@ -398,6 +416,25 @@ match_required_test_() ->
   , ?_assertEqual({false, [] , []} , match(req([A])   , []))
   , ?_assertEqual({false, [X], []} , match(req([A])   , [X]))
   , ?_assertEqual({false, [A], []} , match(req([A, X]), [A]))
+  ].
+
+match_either_test_() ->
+  OA  = opt("-a"),
+  OB  = opt("-b"),
+  OC  = opt("-c"),
+  OX  = opt("-x"),
+  AN  = arg("N"),
+  AM  = arg("M"),
+  A1  = arg(undefined, 1),
+  A2  = arg(undefined, 2),
+  AN1 = arg("N", 1),
+  AM2 = arg("M", 2),
+  [ ?_assertEqual({true , []  , [OA]}, match(either([OA, OB])    , [OA]))
+  , ?_assertEqual({true , [OB], [OA]}, match(either([OA, OB])    , [OA, OB]))
+  , ?_assertEqual({false, [OX], []}  , match(either([OA, OB])    , [OX]))
+  , ?_assertEqual({true , [OX], [OB]}, match(either([OA, OB, OC]), [OX, OB]))
+  , ?_assertEqual({true , []  , [AN1, AM2]},
+                  match(either([AM, req([AN, AM])]), [A1, A2]))
   ].
 
 partition(Str, Delim) ->
