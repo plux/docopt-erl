@@ -699,10 +699,12 @@ option_parse_test_() ->
                   option_parse("-h TOPIC  Descripton... [dEfAuLt: 2]"))
   ].
 
-option_name_test_() ->
-  [ ?_assertEqual("-h"    , option_name(#option{short="-h"}))
-  , ?_assertEqual("--help", option_name(#option{short="-h", long="--help"}))
-  , ?_assertEqual("--help", option_name(#option{long="--help"}))
+name_test_() ->
+  [ ?_assertEqual("-h"    , name(opt("-h")))
+  , ?_assertEqual("--help", name(opt("-h", "--help")))
+  , ?_assertEqual("--help", name(opt(undefined, "--help")))
+  , ?_assertEqual("foo"   , name(arg("foo")))
+  , ?_assertEqual("foo"   , name(cmd("foo")))
   ].
 
 %%%_* Emacs ===================================================================
