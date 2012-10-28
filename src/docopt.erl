@@ -48,9 +48,26 @@
 %%%_* Code ====================================================================
 
 docopt(Doc, Args) ->
-  Options = parse_doc_options(Doc),
-  Args    = parse_args(Args, Options),
-  [{option_name(Opt), Opt#option.value} || Opt <- Options].
+  Usage      = printable_usage(Doc),
+  Options    = parse_doc_options(Doc),
+  Pattern    = parse_pattern(formal_usage(Usage), Options),
+  ParsedArgs = parse_args(Args, Options),
+  case match(fix(Pattern), ParsedArgs) of
+    {true, [], Collected} ->
+      ct:pal("\n"
+             "args:       ~p\n"
+             "usage:      ~p\n"
+             "options:    ~p\n"
+             "pattern:    ~p\n"
+             "parsedargs: ~p\n"
+             "collected:  ~p\n"
+             "flat patns: ~p\n",
+         [Args,Usage,Options,Pattern,ParsedArgs,Collected,flatten(Pattern)]),
+      lists:foldl(fun (Pat, Acc) ->
+                      orddict:store(name(Pat), value(Pat), Acc)
+                  end, orddict:new(), flatten(Pattern) ++ Options ++ Collected);
+    Res -> {error, {"failed to parse :(", Res}}
+  end.
 
 fix(X) -> X. %% TODO
 
@@ -377,6 +394,36 @@ debug(_Fmt, _Args) -> ok.
 -endif.
 
 %%%_* Tests ===================================================================
+
+docopt_any_options_test_() ->
+  Doc = "Usage: prog [options] A
+
+    -q  Be quiet
+    -v  Be verbose.",
+  D = fun(L) -> orddict:from_list(L) end,
+  [ ?_assertEqual(D([{"A", "arg"}, {"-v", false}, {"-q", false}]),
+                  docopt(Doc, "arg"))
+  , ?_assertEqual(D([{"A", "arg"}, {"-v", true}, {"-q", false}]),
+                  docopt(Doc, "-v arg"))
+  , ?_assertEqual(D([{"A", "arg"}, {"-v", false}, {"-q", true}]),
+                  docopt(Doc, "-q arg"))
+  ].
+
+docopt_commands_test_() ->
+  D = fun(L) -> orddict:from_list(L) end,
+  [ ?_assertEqual(D([{"add", true}]) , docopt("Usage: prog add", "add"))
+  , ?_assertEqual(D([{"add", false}]), docopt("Usage: prog [add]", ""))
+  , ?_assertEqual(D([{"add", true}]) , docopt("Usage: prog [add]", "add"))
+  , ?_assertEqual(D([{"add", true}, {"rm", false}]),
+                  docopt("Usage: prog (add|rm)", "add"))
+  , ?_assertEqual(D([{"add", false}, {"rm", true}]),
+                  docopt("Usage: prog (add|rm)", "rm"))
+  , ?_assertEqual(D([{"a", true}, {"b", true}]),
+                  docopt("Usage: prog a b", "a b"))
+  %% TODO:
+  %% , ?_assertThrow(_, docopt("Usage: prog a b", "b a"))
+  ]
+.
 
 match_option_test_() ->
   A  = opt("-a"),
