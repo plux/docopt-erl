@@ -425,6 +425,29 @@ docopt_commands_test_() ->
   ]
 .
 
+parse_doc_options_test() ->
+  Doc = "-h, --help  Print help message.
+         -o FILE     Output file.
+         --verbose   Verbose mode.",
+  ?assertEqual([ opt("-h", "--help")
+               , opt("-o", undefined, 1)
+               , opt(undefined, "--verbose")
+               ], parse_doc_options(Doc)).
+
+basic_pattern_matching_test_() ->
+  %% ( -a N [ -x Z ] )
+  P = req([opt("-a"), arg("N"), optional([opt("-x"), arg("Z")])]),
+  [ { "-a N"
+    , ?_assertEqual({true, [], [opt("-a"), arg("N", 9)]},
+                    match(P, [opt("-a"), arg(9)]))}
+  , { "-a -x N Z"
+    , ?_assertEqual({true, [], [opt("-a"), arg("N",9), opt("-x"), arg("Z", 5)]},
+                    match(P, [opt("-a"), opt("-x"), arg(9), arg(5)]))}
+  , { "-x N Z # BZZ!"
+    , ?_assertEqual({false, [opt("-x"), arg(9), arg(5)], []},
+                    match(P, [opt("-x"), arg(9), arg(5)]))}
+  ].
+
 match_option_test_() ->
   A  = opt("-a"),
   AT = A#option{value = true},
