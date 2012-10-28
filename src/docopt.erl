@@ -364,78 +364,78 @@ parse_pattern_test_() ->
   HelpOpt    = #option{short="-h", value=true},
   FileOpt    = #option{short="-f", long="--file", argcount=1, value="<f>"},
   VerboseOpt = #option{short="-v", long="--verbose", value=true},
-  O = [option("-h"), option("-v", "--verbose"), option("-f", "--file", 1)],
+  O = [opt("-h"), opt("-v", "--verbose"), opt("-f", "--file", 1)],
   [ ?_assertEqual(
-       required([optional([HelpOpt])]),
+       req([optional([HelpOpt])]),
        parse_pattern("[ -h ]", O))
   , ?_assertEqual(
-       required([optional([one_or_more([argument("ARG")])])]),
+       req([optional([HelpOpt])]),
+       parse_pattern("[ -h ]", []))
+  , ?_assertEqual(
+       req([optional([#option{long="--verbose", value=true}])]),
+       parse_pattern("[ --verbose ]", []))
+  , ?_assertEqual(
+       req([optional([one_or_more([arg("ARG")])])]),
        parse_pattern("[ ARG ... ]", O))
   , ?_assertEqual(
-       required([optional([either([HelpOpt, VerboseOpt])])]),
+       req([optional([either([HelpOpt, VerboseOpt])])]),
        parse_pattern("[ -h | -v ]", O))
   , ?_assertEqual(
-       required([VerboseOpt, optional([FileOpt])]),
+       req([VerboseOpt, optional([FileOpt])]),
        parse_pattern("-v [ --file <f> ]", O))
   , ?_assertEqual(
-       required([optional([either([argument("M"),
-                                   required([either([argument("K"),
-                                                     argument("L")])])])])]),
+       req([optional([either([arg("M"), req([either([arg("K"),
+                                                     arg("L")])])])])]),
        parse_pattern("[M | (K | L)]", O))
   , ?_assertEqual(
-       required([argument("N"), argument("M")]),
+       req([arg("N"), arg("M")]),
        parse_pattern("N M", O))
   , ?_assertEqual(
-       required([argument("N"), optional([argument("M")])]),
+       req([arg("N"), optional([arg("M")])]),
        parse_pattern("N [M]", O))
   , ?_assertEqual(
-       required([argument("N"), optional([either([argument("M"),
-                                                  argument("K"),
-                                                  argument("L")])])]),
-      parse_pattern("N [M | K | L]", O))
+       req([arg("N"), optional([either([arg("M"), arg("K"), arg("L")])])]),
+       parse_pattern("N [M | K | L]", O))
   , ?_assertEqual(
-       required([optional([HelpOpt]), optional([argument("N")])]),
+       req([optional([HelpOpt]), optional([arg("N")])]),
        parse_pattern("[ -h ] [N]", O))
   , ?_assertEqual(
-       required([optional(lists:reverse(O))]),
+       req([optional(lists:reverse(O))]),
        parse_pattern("[options]", O))
   , ?_assertEqual(
-       required([argument("ADD")]),
+       req([arg("ADD")]),
        parse_pattern("ADD", O))
   , ?_assertEqual(
-       required([argument("<add>")]),
+       req([arg("<add>")]),
        parse_pattern("<add>", O))
   , ?_assertEqual(
-       required([command("add")]),
+       req([cmd("add")]),
        parse_pattern("add", O))
   , ?_assertEqual(
-       required([required([either([HelpOpt,
-                                   required([VerboseOpt,
-                                             optional([argument("A")])])])])]),
+       req([req([either([HelpOpt, req([VerboseOpt, optional([arg("A")])])])])]),
        parse_pattern("( -h | -v [ A ] )", O))
   , ?_assertEqual(
-       required(
-         [required(
-            [either(
-               [required([argument("N"),
-                          optional([either([argument("M"),
-                                            required([either([argument("K"),
-                                                              argument("L")
-                                                             ])])])])]),
-                required([argument("O"), argument("P")])])])]),
+       req([req([either([req([arg("N"),
+                              optional([either([arg("M"),
+                                                req([either([arg("K"),
+                                                             arg("L")
+                                                            ])])])])]),
+                         req([arg("O"), arg("P")])])])]),
        parse_pattern("(N [M | (K | L)] | O P)", O))
   ].
 
-argument(Arg)         -> #argument{name=Arg}.
-command(Cmd)          -> #command{name=Cmd}.
-required(Children)    -> #required{children=Children}.
+arg(Arg)              -> #argument{name=Arg}.
+arg(Arg, Value)       -> #argument{name=Arg, value=Value}.
+cmd(Cmd)              -> #command{name=Cmd}.
+cmd(Cmd, Value)       -> #command{name=Cmd, value=Value}.
+req(Children)         -> #required{children=Children}.
 either(Children)      -> #either{children=Children}.
 optional(Children)    -> #optional{children=Children}.
 one_or_more(Children) -> #one_or_more{children=Children}.
 
-option(Short)           -> #option{short=Short}.
-option(Short, Long)     -> #option{short=Short, long=Long}.
-option(Short, Long, Ac) -> #option{short=Short, long=Long, argcount=Ac}.
+opt(Short)            -> #option{short=Short}.
+opt(Short, Long)      -> #option{short=Short, long=Long}.
+opt(Short, Long, Ac)  -> #option{short=Short, long=Long, argcount=Ac}.
 
 partition_test_() ->
   [ ?_assertEqual({"foobar", ""}     , partition("foobar"      , "abc"))
