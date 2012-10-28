@@ -361,12 +361,9 @@ single_match(Pat, Rest) ->
     [Match|_] -> {match, match_result(Pat, Match), lists:delete(Match, Rest)}
   end.
 
-match_result(#option{}   = Opt, Match) ->
-  Opt#option{value=Match#option.value};
-match_result(#argument{} = Arg, Match) ->
-  Arg#argument{value=Match#argument.value};
-match_result(#command{}  = Cmd, _Match) ->
-  Cmd#command{value=true}.
+match_result(#option{}   = Opt, O) -> Opt#option{value=O#option.value};
+match_result(#argument{} = Arg, A) -> Arg#argument{value=A#argument.value};
+match_result(#command{}  = Cmd, _) -> Cmd#command{value=true}.
 
 match_fun(#option{}=Opt) ->
   fun(#option{}=O) -> name(O) == name(Opt);
