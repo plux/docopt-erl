@@ -341,7 +341,7 @@ match_either(#either{children=Children}, Rest0, Acc0) ->
   end.
 
 most_consumed({_, R, _}=Res, {_, Min, _}) when length(R) < length(Min) -> Res;
-most_consumed({_, _, _}   , Acc)                                      -> Acc.
+most_consumed({_, _, _}    , Acc)                                      -> Acc.
 
 match_one_or_more(#one_or_more{children=Children}, Rest0, Acc0) ->
   todo.
