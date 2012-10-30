@@ -503,6 +503,35 @@ basic_pattern_matching_test_() ->
 %%   [ ?_assertEqual([{"-", true}], docopt("usage: prog [-]", "-"))
 %%   , ?_assertEqual([{"-", false}], docopt("usage: prog [-]", ""))
 %%   ].
+
+allow_empty_pattern_test() ->
+  ?assertEqual([], docopt("usage: prog", "")).
+
+docopt_test_() ->
+  Doc = "Usage: prog [-vqr] [FILE]
+                prog INPUT OUTPUT
+                prog --help
+
+  Options:
+    -v  print status messages
+    -q  report only file names
+    -r  show all occurrences of the same error
+    --help
+
+  ",
+  D = fun(L) -> orddict:from_list(L) end,
+  %% TODO: FILE/INPUT/OUTPUT should be undefined, not false
+  [ ?_assertEqual(D([ {"-v", true}, {"-q", false}, {"-r", false}
+                    , {"--help", false}, {"FILE", "file.py"}
+                    , {"INPUT", false}, {"OUTPUT", false}]),
+                  docopt(Doc, "-v file.py"))
+  , ?_assertEqual(D([ {"-v", true}, {"-q", false}, {"-r", false}
+                    , {"--help", false}, {"FILE", false}
+                    , {"INPUT", false}, {"OUTPUT", false}]),
+                  docopt(Doc, "-v"))
+  %% TODO: Assert exceptions
+  ].
+
 match_option_test_() ->
   A  = opt("-a"),
   AT = A#option{value = true},
