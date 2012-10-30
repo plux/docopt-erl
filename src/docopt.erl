@@ -385,7 +385,7 @@ match_either(#either{children=Children}, Rest0, Acc0) ->
 most_consumed({_, R, _}=Res, {_, Min, _}) when length(R) < length(Min) -> Res;
 most_consumed({_, _, _}    , Acc)                                      -> Acc.
 
-match_one_or_more(#one_or_more{children=Children}, Rest0, Acc0) ->
+match_one_or_more(#one_or_more{children=_Children}, _Rest0, _Acc0) ->
   todo.
 
 match_child_pattern(Pat, Rest0, Acc) ->
