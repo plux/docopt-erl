@@ -71,6 +71,34 @@ docopt(Doc, Args) ->
 
 fix(X) -> X. %% TODO
 
+fix_either(Pat) when not is_list(Pat) ->
+  either(lists:map(fun ([[_|_]=P]) -> req(P);
+                       (P)         -> req(P)
+                   end, fix_either([[Pat]])));
+fix_either([]) -> [];
+fix_either([Children0|Groups0]) ->
+  Groups = lists:foldl(fun(Type, false) ->
+                           %% Eeek, matching on record tuple structure..
+                           case lists:keyfind(Type, 1, Children0) of
+                             false -> false;
+                             Pat   ->
+                               Children = lists:delete(Pat, Children0),
+                               Groups0 ++ fix_either(Pat, Children)
+                           end;
+                          (_Type, Acc) -> Acc
+                       end, false, [either, required, optional, one_or_more]),
+  case Groups of
+    false  -> [Children0|fix_either(Groups0)];
+    Groups -> fix_either(Groups)
+  end.
+
+fix_either(#either{}=Pat, Children)      ->
+  [[C|Children] || C <- Pat#either.children];
+fix_either(#required{}=Pat, Children)    -> [Pat#required.children ++ Children];
+fix_either(#optional{}=Pat, Children)    -> [Pat#optional.children ++ Children];
+fix_either(#one_or_more{}=Pat, Children) ->
+  [Pat#one_or_more.children ++ Pat#one_or_more.children ++ Children].
+
 flatten(#required{children=Children})    -> flatten_children(Children);
 flatten(#either{children=Children})      -> flatten_children(Children);
 flatten(#one_or_more{children=Children}) -> flatten_children(Children);
@@ -717,6 +745,25 @@ option_parse_test_() ->
                   option_parse("-h, --help=DIR  ... [default: ./]"))
   , ?_assertEqual(#option{short="-h",argcount=1, value="2"},
                   option_parse("-h TOPIC  Descripton... [dEfAuLt: 2]"))
+  ].
+
+fix_either_test_() ->
+  OA = opt("-a"),
+  OB = opt("-b"),
+  OC = opt("-c"),
+  AN = arg("N"),
+  AM = arg("M"),
+  [ ?_assertEqual(either([req([OA])]), fix_either(OA))
+  , ?_assertEqual(either([req([AN])]), fix_either(AN))
+  , ?_assertEqual(either([req([AN, AM, AN, AM])]),
+                  fix_either(one_or_more([AN, AM])))
+  , ?_assertEqual(either([req([OA, OC]), req([OB, OC])]),
+                  fix_either(req([either([OA, OB]), OC])))
+  , ?_assertEqual(either([req([OB, OA]), req([OC, OA])]),
+                  fix_either(optional([OA, either([OB, OC])])))
+  , ?_assertEqual(either([req([OA]), req([OB]), req([OC])]),
+                  fix_either(either([OA, either([OB, OC])])))
+
   ].
 
 name_test_() ->
