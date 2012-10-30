@@ -123,8 +123,22 @@ parse_doc_options(Doc) ->
   [_|OptStrings] = re:split(Doc, "^ *-|\\n *-", [{return, list}]),
   [option_parse("-" ++ S) || S <- OptStrings].
 
+strip(Str) ->
+  StripLeft = fun (S) ->
+                  lists:dropwhile(fun(C) -> lists:member(C, [$ , $\n]) end, S)
+              end,
+  lists:reverse(StripLeft(lists:reverse(StripLeft(Str)))).
+
+strip_test_() ->
+  [ ?_assertEqual(""       , strip(""))
+  , ?_assertEqual("foo"    , strip("foo"))
+  , ?_assertEqual("foo"    , strip("\n    \n  \nfoo"))
+  , ?_assertEqual("foo"    , strip("    \n\n  \nfoo   \n \n  "))
+  , ?_assertEqual("foo bar", strip("  \n  \n  \nfoo bar \n \n"))
+  ].
+
 option_parse(Str) ->
-  {Options, Desc} = partition(string:strip(Str), "  "),
+  {Options, Desc} = partition(strip(Str), "  "),
   lists:foldl(fun([$-,$-|_] = S, Opt) -> Opt#option{long  = S};
                  ([$-|_]    = S, Opt) -> Opt#option{short = S};
                  (_            , Opt) ->
@@ -231,7 +245,7 @@ printable_usage(Doc) ->
       throw("More than one \"usage:\" (case-insensitive)");
     [_|UsageSplit] ->
       L = re:split(lists:flatten(UsageSplit), "\\n\\s*\\n", [{return, list}]),
-      string:strip(hd(L))
+      strip(hd(L))
   end.
 
 formal_usage(PrintableUsage) ->
