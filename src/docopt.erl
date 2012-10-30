@@ -22,6 +22,7 @@
 -record(either      , {children :: [pattern()]}).
 
 %% Child patterns
+%% TODO: Default for arguments should be undefined
 -record(command  , {name :: string(), value = false :: any()}).
 -record(argument , {name :: string(), value = false :: any()}).
 -record(option   , { short            :: string()
@@ -487,6 +488,21 @@ basic_pattern_matching_test_() ->
                     match(P, [opt("-x"), arg(9), arg(5)]))}
   ].
 
+%% TODO:
+%% allow_double_dash_test_() ->
+%%   Doc = "Usage: prog [-o] [--] <arg>
+
+%%          -o",
+%%   D = fun(L) -> orddict:from_list(L) end,
+%%   [ ?_assertEqual(D([{"-o", false}, {"<arg>", "-o"}, {"--", true}]),
+%%                   docopt(Doc, "-- -o"))
+%%   ].
+
+%% TODO:
+%% allow_single_dash_test_() ->
+%%   [ ?_assertEqual([{"-", true}], docopt("usage: prog [-]", "-"))
+%%   , ?_assertEqual([{"-", false}], docopt("usage: prog [-]", ""))
+%%   ].
 match_option_test_() ->
   A  = opt("-a"),
   AT = A#option{value = true},
@@ -572,6 +588,16 @@ match_either_test_() ->
                   match(either([AM, req([AN, AM])]), [A1, A2]))
   ].
 
+%% TODO:
+%% match_one_or_more_test_() ->
+%%   A  = arg("A"),
+%%   AV = arg("A", 9),
+%%   V  = arg(undefined, 9),
+%%   OX = opt("-x"),
+%%   [ ?_assertEqual({true, [], [AV]}, match(one_or_more([A]), [V]))
+%%   , ?_assertEqual({false, [], []}, match(one_or_more([A]), []))
+%%   , ?_assertEqual({false, [OX], []}, match(one_or_more([A]), [OX]))
+%%   ].
 parse_atom_test_() ->
   O = [ #option{short="-h"}
       , #option{short="-v", long="--verbose"}
