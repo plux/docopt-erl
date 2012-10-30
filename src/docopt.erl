@@ -507,10 +507,9 @@ match_command_test_() ->
   [ ?_assertEqual({true , []      , [CT]}, match(C, [AC]))
   , ?_assertEqual({false, [OX]    , []}  , match(C, [OX]))
   , ?_assertEqual({true , [OX, OA], [CT]}, match(C, [OX, OA, AC]))
-  , ?_assertEqual({true, [], [cmd("rm", true)]},
+  , ?_assertEqual({true , []      , [cmd("rm", true)]},
                   match(either([cmd("add"), cmd("rm")]),
                         [arg(undefined, "rm")]))
-    %% Either...
   ].
 
 match_optional_test_() ->
@@ -743,7 +742,7 @@ option_parse_test_() ->
                   option_parse("--help=TOPIC  ... [default: 3.14]"))
   , ?_assertEqual(#option{short="-h", long="--help", argcount=1, value="./"},
                   option_parse("-h, --help=DIR  ... [default: ./]"))
-  , ?_assertEqual(#option{short="-h",argcount=1, value="2"},
+  , ?_assertEqual(#option{short="-h", argcount=1, value="2"},
                   option_parse("-h TOPIC  Descripton... [dEfAuLt: 2]"))
   ].
 
