@@ -78,16 +78,6 @@ fix_list_arguments(Pat) ->
 count(X, Patterns) ->
   length([P || P <- Patterns, X == P]).
 
-fix_list_arguments_test_() ->
-  Fix = fun fix_list_arguments/1,
-  [ ?_assertEqual(opt("-a"), Fix(opt("-a")))
-  , ?_assertEqual(arg("N", undefined), Fix(arg("N", undefined)))
-  , ?_assertEqual(req([arg("N", []), arg("N", [])]),
-                  Fix(req([arg("N"), arg("N")])))
-  , ?_assertEqual(either([arg("N", []), one_or_more([arg("N", [])])]),
-                  Fix(either([arg("N"), one_or_more([arg("N")])])))
-  ].
-
 do_fix_list_arguments(Pat, FixThese) ->
   case children(Pat) of
     undefined ->
@@ -176,14 +166,6 @@ strip(Str) ->
                   lists:dropwhile(fun(C) -> lists:member(C, [$ , $\n]) end, S)
               end,
   lists:reverse(StripLeft(lists:reverse(StripLeft(Str)))).
-
-strip_test_() ->
-  [ ?_assertEqual(""       , strip(""))
-  , ?_assertEqual("foo"    , strip("foo"))
-  , ?_assertEqual("foo"    , strip("\n    \n  \nfoo"))
-  , ?_assertEqual("foo"    , strip("    \n\n  \nfoo   \n \n  "))
-  , ?_assertEqual("foo bar", strip("  \n  \n  \nfoo bar \n \n"))
-  ].
 
 option_parse(Str) ->
   {Options, Desc} = partition(strip(Str), "  "),
@@ -475,28 +457,6 @@ replace_test() ->
   ?assertEqual([a]    , replace(1, a, [])),
   ?assertEqual([2,3,a], replace(1, a, [2,3])),
   ?assertEqual([1,b,3], replace(2, b, [1,2,3])).
-
-list_argument_match_test_() ->
-  M = fun (Pat, Args) -> match(fix_list_arguments(Pat), Args) end,
-  [ ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
-                  M(req([arg("N"), arg("N")]),
-                    [arg(undefined, "1"), arg(undefined, "2")]))
-  , ?_assertEqual({true, [], [arg("N", ["1", "2", "3"])]},
-                 M(one_or_more([arg("N")]),
-                   [ arg(undefined, "1")
-                   , arg(undefined, "2")
-                   , arg(undefined, "3")
-                   ]))
-  , ?_assertEqual({true, [], [arg("N", ["1", "2", "3"])]},
-                  M(req([arg("N"), one_or_more([arg("N")])]),
-                    [ arg(undefined, "1")
-                    , arg(undefined, "2")
-                    , arg(undefined, "3")
-                    ]))
-  , ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
-                  M(req([arg("N"), req([arg("N")])]),
-                    [arg(undefined, "1"), arg(undefined, "2")]))
-  ].
 
 single_match(Pat, Rest) ->
   case lists:filter(match_fun(Pat), Rest) of
@@ -940,6 +900,46 @@ name_test_() ->
   , ?_assertEqual("--help", name(opt(undefined, "--help")))
   , ?_assertEqual("foo"   , name(arg("foo")))
   , ?_assertEqual("foo"   , name(cmd("foo")))
+  ].
+
+list_argument_match_test_() ->
+  M = fun (Pat, Args) -> match(fix_list_arguments(Pat), Args) end,
+  [ ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
+                  M(req([arg("N"), arg("N")]),
+                    [arg(undefined, "1"), arg(undefined, "2")]))
+  , ?_assertEqual({true, [], [arg("N", ["1", "2", "3"])]},
+                 M(one_or_more([arg("N")]),
+                   [ arg(undefined, "1")
+                   , arg(undefined, "2")
+                   , arg(undefined, "3")
+                   ]))
+  , ?_assertEqual({true, [], [arg("N", ["1", "2", "3"])]},
+                  M(req([arg("N"), one_or_more([arg("N")])]),
+                    [ arg(undefined, "1")
+                    , arg(undefined, "2")
+                    , arg(undefined, "3")
+                    ]))
+  , ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
+                  M(req([arg("N"), req([arg("N")])]),
+                    [arg(undefined, "1"), arg(undefined, "2")]))
+  ].
+
+fix_list_arguments_test_() ->
+  Fix = fun fix_list_arguments/1,
+  [ ?_assertEqual(opt("-a"), Fix(opt("-a")))
+  , ?_assertEqual(arg("N", undefined), Fix(arg("N", undefined)))
+  , ?_assertEqual(req([arg("N", []), arg("N", [])]),
+                  Fix(req([arg("N"), arg("N")])))
+  , ?_assertEqual(either([arg("N", []), one_or_more([arg("N", [])])]),
+                  Fix(either([arg("N"), one_or_more([arg("N")])])))
+  ].
+
+strip_test_() ->
+  [ ?_assertEqual(""       , strip(""))
+  , ?_assertEqual("foo"    , strip("foo"))
+  , ?_assertEqual("foo"    , strip("\n    \n  \nfoo"))
+  , ?_assertEqual("foo"    , strip("    \n\n  \nfoo   \n \n  "))
+  , ?_assertEqual("foo bar", strip("  \n  \n  \nfoo bar \n \n"))
   ].
 
 %%%_* Emacs ===================================================================
