@@ -717,16 +717,16 @@ match_either_test_() ->
                   match(either([AM, req([AN, AM])]), [A1, A2]))
   ].
 
-%% TODO:
-%% match_one_or_more_test_() ->
-%%   A  = arg("A"),
-%%   AV = arg("A", 9),
-%%   V  = arg(undefined, 9),
-%%   OX = opt("-x"),
-%%   [ ?_assertEqual({true, [], [AV]}, match(one_or_more([A]), [V]))
-%%   , ?_assertEqual({false, [], []}, match(one_or_more([A]), []))
-%%   , ?_assertEqual({false, [OX], []}, match(one_or_more([A]), [OX]))
-%%   ].
+match_one_or_more_test_() ->
+  A  = arg("A"),
+  AV = arg("A", 9),
+  V  = arg(undefined, 9),
+  OX = opt("-x"),
+  [ ?_assertEqual({true , []  , [AV]}, match(one_or_more([A]), [V]))
+  , ?_assertEqual({false, []  , []}  , match(one_or_more([A]), []))
+  , ?_assertEqual({false, [OX], []}  , match(one_or_more([A]), [OX]))
+  ].
+
 parse_atom_test_() ->
   O = [ #option{short="-h"}
       , #option{short="-v", long="--verbose"}
