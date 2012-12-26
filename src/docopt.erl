@@ -93,13 +93,7 @@ do_fix_list_arguments(Pat, FixThese) ->
     undefined ->
       case lists:member(Pat, FixThese) of
         false -> Pat;
-        true  ->
-          case Pat of
-            #argument{}         -> Pat#argument{value=[]};
-            #command{}          -> Pat#command{value=0};
-            #option{argcount=0} -> Pat#option{value=0};
-            #option{}           -> Pat#option{value=[]}
-          end
+        true  -> set_default_value(Pat)
       end;
     Children ->
       set_children(Pat, [do_fix_list_arguments(C, FixThese) || C <- Children])
@@ -167,6 +161,11 @@ value(#option{value=Value})   -> Value.
 set_value(#command{}  = Cmd, Value) -> Cmd#command{value = Value};
 set_value(#argument{} = Arg, Value) -> Arg#argument{value = Value};
 set_value(#option{}   = Opt, Value) -> Opt#option{value = Value}.
+
+set_default_value(#argument{}         = P) -> P#argument{value=[]};
+set_default_value(#command{}          = P) -> P#command{value=0};
+set_default_value(#option{argcount=0} = P) -> P#option{value=0};
+set_default_value(#option{}           = P) -> P#option{value=[]}.
 
 parse_doc_options(Doc) ->
   [_|OptStrings] = re:split(Doc, "^ *-|\\n *-", [{return, list}]),
