@@ -450,10 +450,32 @@ match_child_pattern(Pat, Rest0, Acc) ->
   case single_match(Pat, Rest0) of
     nomatch              -> {false, Rest0, Acc};
     {match, Match, Rest} ->
-      %% SameName = lists:filter(match_fun(Pat), Rest0)
-      %% TODO: Add increment stuff here... BLEH
-      {true, Rest, [Match|Acc]}
+      SameName = lists:filter(match_fun(Pat), Acc),
+      %% TODO: Refactor this crap
+      case value(Pat) of
+        0 ->
+          case SameName of
+            []       -> {true, Rest, [set_value(Match, 1)|Acc]};
+            [Same|_] -> {true, Rest, replace(Same, set_value(Same, value(Same)+1), Acc)}
+          end;
+        [] ->
+          case SameName of
+            []       -> {true, Rest, [set_value(Match, [value(Match)])|Acc]};
+            [Same|_] -> {true, Rest, replace(Same, set_value(Same, value(Same) ++ [value(Match)]), Acc)}
+          end;
+        _Value -> {true, Rest, [Match|Acc]}
+      end
   end.
+
+replace(_Old, New, [])     -> [New];
+replace(Old, New, [Old|T]) -> [New|T];
+replace(Old, New, [H|T])   -> [H|replace(Old, New, T)].
+
+replace_test() ->
+  ?assertEqual([a,2,3], replace(1, a, [1,2,3])),
+  ?assertEqual([a]    , replace(1, a, [])),
+  ?assertEqual([2,3,a], replace(1, a, [2,3])),
+  ?assertEqual([1,b,3], replace(2, b, [1,2,3])).
 
 list_argument_match_test_() ->
   M = fun (Pat, Args) -> match(fix_list_arguments(Pat), Args) end,
