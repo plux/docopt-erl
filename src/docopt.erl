@@ -158,9 +158,9 @@ value(#command{value=Value})  -> Value;
 value(#argument{value=Value}) -> Value;
 value(#option{value=Value})   -> Value.
 
-set_value(#command{}  = Cmd, Value) -> Cmd#command{value = Value};
-set_value(#argument{} = Arg, Value) -> Arg#argument{value = Value};
-set_value(#option{}   = Opt, Value) -> Opt#option{value = Value}.
+set_value(#command{}  = P, Value) -> P#command{value=Value};
+set_value(#argument{} = P, Value) -> P#argument{value=Value};
+set_value(#option{}   = P, Value) -> P#option{value=Value}.
 
 set_default_value(#argument{}         = P) -> P#argument{value=[]};
 set_default_value(#command{}          = P) -> P#command{value=0};
