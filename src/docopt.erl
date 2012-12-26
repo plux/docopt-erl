@@ -427,25 +427,22 @@ consume_one_or_more(Pat, Rest0, Acc0) ->
     {false, Rest, Acc} -> {Rest, Acc}
   end.
 
-match_child_pattern(Pat, Rest0, Acc) ->
+match_child_pattern(Pat, Rest0, Acc0) ->
   case single_match(Pat, Rest0) of
-    nomatch              -> {false, Rest0, Acc};
+    nomatch              -> {false, Rest0, Acc0};
     {match, Match, Rest} ->
-      SameName = lists:filter(match_fun(Pat), Acc),
-      %% TODO: Refactor this crap
-      case value(Pat) of
-        0 ->
-          case SameName of
-            []       -> {true, Rest, [set_value(Match, 1)|Acc]};
-            [Same|_] -> {true, Rest, replace(Same, set_value(Same, value(Same)+1), Acc)}
-          end;
-        [] ->
-          case SameName of
-            []       -> {true, Rest, [set_value(Match, [value(Match)])|Acc]};
-            [Same|_] -> {true, Rest, replace(Same, set_value(Same, value(Same) ++ [value(Match)]), Acc)}
-          end;
-        _Value -> {true, Rest, [Match|Acc]}
-      end
+      SameName = lists:filter(fun(P) -> name(P) == name(Pat) end, Acc0),
+      Acc =
+        case {value(Pat), SameName} of
+          {0 , []}       -> [set_value(Match, 1)|Acc0];
+          {0 , [Same|_]} -> replace(Same, set_value(Same, value(Same)+1), Acc0);
+          {[], []}       -> [set_value(Match, [value(Match)])|Acc0];
+          {[], [Same|_]} ->
+            replace(Same, set_value(Same, value(Same) ++ [value(Match)]), Acc0);
+          _              -> [Match|Acc0]
+        end,
+      {true, Rest, Acc}
+
   end.
 
 replace(_Old, New, [])     -> [New];
