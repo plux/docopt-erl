@@ -53,7 +53,7 @@ docopt(Doc, Args) ->
   Options    = parse_doc_options(Doc),
   Pattern    = parse_pattern(formal_usage(Usage), Options),
   ParsedArgs = parse_args(Args, Options),
-  case match(fix(Pattern), ParsedArgs) of
+  case match(fix_list_arguments(Pattern), ParsedArgs) of
     {true, [], Collected} ->
       ct:pal("\n"
              "args:       ~p\n"
@@ -70,7 +70,40 @@ docopt(Doc, Args) ->
     Res -> {error, {"failed to parse :(", Res}}
   end.
 
-fix(X) -> X. %% TODO
+fix_list_arguments(Pat) ->
+  Either   = [children(C) || C <- children(fix_either(Pat))],
+  FixThese = [E || Case <- Either, E <- Case, count(E, Case) > 1],
+  do_fix_list_arguments(Pat, FixThese).
+
+count(X, Patterns) ->
+  length([P || P <- Patterns, X == P]).
+
+fix_list_arguments_test_() ->
+  Fix = fun fix_list_arguments/1,
+  [ ?_assertEqual(opt("-a"), Fix(opt("-a")))
+  , ?_assertEqual(arg("N", undefined), Fix(arg("N", undefined)))
+  , ?_assertEqual(req([arg("N", []), arg("N", [])]),
+                  Fix(req([arg("N"), arg("N")])))
+  , ?_assertEqual(either([arg("N", []), one_or_more([arg("N", [])])]),
+                  Fix(either([arg("N"), one_or_more([arg("N")])])))
+  ].
+
+do_fix_list_arguments(Pat, FixThese) ->
+  case children(Pat) of
+    undefined ->
+      case lists:member(Pat, FixThese) of
+        false -> Pat;
+        true  ->
+          case Pat of
+            #argument{}         -> Pat#argument{value=[]};
+            #command{}          -> Pat#command{value=0};
+            #option{argcount=0} -> Pat#option{value=0};
+            #option{}           -> Pat#option{value=[]}
+          end
+      end;
+    Children ->
+      set_children(Pat, [do_fix_list_arguments(C, FixThese) || C <- Children])
+  end.
 
 fix_either(Pat) when not is_list(Pat) ->
   either(lists:map(fun ([[_|_]=P]) -> req(P);
@@ -111,6 +144,17 @@ flatten(#argument{}=Arg)                 -> [Arg].
 flatten_children(Children) ->
   lists:flatten(lists:map(fun flatten/1, Children)).
 
+children(#required{children=Children})    -> Children;
+children(#either{children=Children})      -> Children;
+children(#one_or_more{children=Children}) -> Children;
+children(#optional{children=Children})    -> Children;
+children(_)                               -> undefined.
+
+set_children(#required{}    = P, Children) -> P#required{children=Children};
+set_children(#either{}      = P, Children) -> P#either{children=Children};
+set_children(#one_or_more{} = P, Children) -> P#one_or_more{children=Children};
+set_children(#optional{}    = P, Children) -> P#optional{children=Children}.
+
 name(#command{name=Name})                 -> Name;
 name(#argument{name=Name})                -> Name;
 name(#option{long=undefined, short=Name}) -> Name;
@@ -119,6 +163,10 @@ name(#option{long=Name})                  -> Name.
 value(#command{value=Value})  -> Value;
 value(#argument{value=Value}) -> Value;
 value(#option{value=Value})   -> Value.
+
+set_value(#command{}  = Cmd, Value) -> Cmd#command{value = Value};
+set_value(#argument{} = Arg, Value) -> Arg#argument{value = Value};
+set_value(#option{}   = Opt, Value) -> Opt#option{value = Value}.
 
 parse_doc_options(Doc) ->
   [_|OptStrings] = re:split(Doc, "^ *-|\\n *-", [{return, list}]),
@@ -397,6 +445,28 @@ match_child_pattern(Pat, Rest0, Acc) ->
       %% TODO: Add increment stuff here... BLEH
       {true, Rest, [Match|Acc]}
   end.
+
+list_argument_match_test_() ->
+  M = fun (Pat, Args) -> match(fix_list_arguments(Pat), Args) end,
+  [ ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
+                  M(req([arg("N"), arg("N")]),
+                    [arg(undefined, "1"), arg(undefined, "2")]))
+  , ?_assertEqual({true, [], [arg("N", ["1", "2", "3"])]},
+                 M(one_or_more([arg("N")]),
+                   [ arg(undefined, "1")
+                   , arg(undefined, "2")
+                   , arg(undefined, "3")
+                   ]))
+  , ?_assertEqual({true, [], [arg("N", ["1", "2", "3"])]},
+                  M(req([arg("N"), one_or_more([arg("N")])]),
+                    [ arg(undefined, "1")
+                    , arg(undefined, "2")
+                    , arg(undefined, "3")
+                    ]))
+  , ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
+                  M(req([arg("N"), req([arg("N")])]),
+                    [arg(undefined, "1"), arg(undefined, "2")]))
+  ].
 
 single_match(Pat, Rest) ->
   case lists:filter(match_fun(Pat), Rest) of
