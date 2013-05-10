@@ -820,7 +820,7 @@ parse_pattern_test_() ->
                                                              arg("L")
                                                             ])])])])]),
                          req([arg("O"), arg("P")])])])]),
-       parse_pattern("(N [M | (K | L)] | O P)", O))
+       ParsePattern("(N [M | (K | L)] | O P)", O))
   ].
 
 arg(A) when is_list(A) -> #argument{name=A};
