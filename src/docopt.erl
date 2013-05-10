@@ -47,6 +47,7 @@
 
 %%%_* Code ====================================================================
 
+-spec docopt(string(), string()) -> orddict:orddict().
 docopt(Doc, Args) ->
   Usage      = printable_usage(Doc),
   Options    = parse_doc_options(Doc),
