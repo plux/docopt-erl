@@ -22,9 +22,8 @@
 -record(either      , {children :: [pattern()]}).
 
 %% Child patterns
-%% TODO: Default for arguments should be undefined
--record(command  , {name :: string(), value = false :: any()}).
--record(argument , {name :: string(), value = false :: any()}).
+-record(command  , {name :: string(), value = false     :: any()}).
+-record(argument , {name :: string(), value = undefined :: any()}).
 -record(option   , { short            :: string()
                    , long             :: string()
                    , argcount = 0     :: non_neg_integer()
