@@ -580,15 +580,17 @@ docopt_test_() ->
 
   ",
   D = fun(L) -> orddict:from_list(L) end,
-  %% TODO: FILE/INPUT/OUTPUT should be undefined, not false
   [ ?_assertEqual(D([ {"-v", true}, {"-q", false}, {"-r", false}
                     , {"--help", false}, {"FILE", "file.py"}
-                    , {"INPUT", false}, {"OUTPUT", false}]),
+                    , {"INPUT", undefined}, {"OUTPUT", undefined}]),
                   docopt(Doc, "-v file.py"))
   , ?_assertEqual(D([ {"-v", true}, {"-q", false}, {"-r", false}
-                    , {"--help", false}, {"FILE", false}
-                    , {"INPUT", false}, {"OUTPUT", false}]),
+                    , {"--help", false}, {"FILE", undefined}
+                    , {"INPUT", undefined}, {"OUTPUT", undefined}]),
                   docopt(Doc, "-v"))
+  , ?_assertThrow(parse_failure, docopt(Doc, "-v input.py output.py"))
+  , ?_assertThrow({"--fake", "not recognized"}, docopt(Doc, "--fake"))
+  %% , ?_assertThrow(parse_failure, docopt(Doc, "--hel"))
   %% TODO: Assert exceptions
   ].
 
