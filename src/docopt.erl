@@ -215,17 +215,17 @@ long(#option{long=Long}) -> Long.
 
 parse_long(State0) ->
   {Raw, Value} = partition(current(State0), "="),
-  Opt0 = lists:filter(fun (#option{long=Long}) ->
-                          Long == Raw orelse (mode(State0) == parse_args
-                                              andalso starts_with(Long, Raw))
-                      end, options(State0)),
-  {Opt, State} = case {mode(State0), Opt0} of
+  Opt0 = [O || O <- options(State0), long(O) == Raw],
+  Opt1 = case mode(State0) == parse_args andalso Opt0 == [] of
+           true  -> [O || O <- options(State0), starts_with(long(O), Raw)];
+           false -> Opt0
+         end,
+  {Opt, State} = case {mode(State0), Opt1} of
                    {parse_pattern, []} ->
-                     Argcount = case Value == [] of
-                                  true  -> 0;
-                                  false -> 1
-                                end,
-                     O = #option{long=Raw, argcount=Argcount},
+                     O = case Value == [] of
+                           true  -> #option{long=Raw, argcount=0};
+                           false -> #option{long=Raw, argcount=1}
+                         end,
                      {O, move(State0#state{options=[O|options(State0)]})};
                    {parse_args, []} -> throw({Raw, "not recognized"});
                    {_, [O]} -> {O, move(State0)};
