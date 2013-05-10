@@ -347,6 +347,8 @@ parse_atom(State) ->
     "["       -> parse_optional(move(State));
     "("       -> parse_required(move(State));
     "options" -> {options(State), move(State)};
+    "--"  = C -> {[#command{name=C}], move(State)};
+    "-"   = C -> {[#command{name=C}], move(State)};
     [$-,$-|_] -> parse_long(State);
     [$-|_]    -> parse_shorts(State);
     Current   ->
