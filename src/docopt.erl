@@ -211,6 +211,8 @@ rest(#state{tokens=[_|Rest]})       -> Rest.
 options(#state{options=Options})    -> Options.
 mode(#state{mode=Mode})             -> Mode.
 
+long(#option{long=Long}) -> Long.
+
 parse_long(State0) ->
   {Raw, Value} = partition(current(State0), "="),
   Opt0 = lists:filter(fun (#option{long=Long}) ->
