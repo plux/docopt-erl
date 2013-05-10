@@ -521,8 +521,7 @@ docopt_commands_test_() ->
                   docopt("Usage: prog a b", "a b"))
   %% TODO:
   %% , ?_assertThrow(_, docopt("Usage: prog a b", "b a"))
-  ]
-.
+  ].
 
 parse_doc_options_test() ->
   Doc = "-h, --help  Print help message.
