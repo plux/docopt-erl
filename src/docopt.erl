@@ -501,25 +501,23 @@ docopt_any_options_test_() ->
 
     -q  Be quiet
     -v  Be verbose.",
-  D = fun(L) -> orddict:from_list(L) end,
-  [ ?_assertEqual(D([{"A", "arg"}, {"-v", false}, {"-q", false}]),
+  [ ?_assertEqual(([{"-q", false}, {"-v", false}, {"A", "arg"}]),
                   docopt(Doc, "arg"))
-  , ?_assertEqual(D([{"A", "arg"}, {"-v", true}, {"-q", false}]),
+  , ?_assertEqual(([{"-q", false}, {"-v", true}, {"A", "arg"}]),
                   docopt(Doc, "-v arg"))
-  , ?_assertEqual(D([{"A", "arg"}, {"-v", false}, {"-q", true}]),
+  , ?_assertEqual(([{"-q", true}, {"-v", false}, {"A", "arg"}]),
                   docopt(Doc, "-q arg"))
   ].
 
 docopt_commands_test_() ->
-  D = fun(L) -> orddict:from_list(L) end,
-  [ ?_assertEqual(D([{"add", true}]) , docopt("Usage: prog add", "add"))
-  , ?_assertEqual(D([{"add", false}]), docopt("Usage: prog [add]", ""))
-  , ?_assertEqual(D([{"add", true}]) , docopt("Usage: prog [add]", "add"))
-  , ?_assertEqual(D([{"add", true}, {"rm", false}]),
+  [ ?_assertEqual(([{"add", true}]) , docopt("Usage: prog add", "add"))
+  , ?_assertEqual(([{"add", false}]), docopt("Usage: prog [add]", ""))
+  , ?_assertEqual(([{"add", true}]) , docopt("Usage: prog [add]", "add"))
+  , ?_assertEqual(([{"add", true}, {"rm", false}]),
                   docopt("Usage: prog (add|rm)", "add"))
-  , ?_assertEqual(D([{"add", false}, {"rm", true}]),
+  , ?_assertEqual(([{"add", false}, {"rm", true}]),
                   docopt("Usage: prog (add|rm)", "rm"))
-  , ?_assertEqual(D([{"a", true}, {"b", true}]),
+  , ?_assertEqual(([{"a", true}, {"b", true}]),
                   docopt("Usage: prog a b", "a b"))
   %% TODO:
   %% , ?_assertThrow(_, docopt("Usage: prog a b", "b a"))
