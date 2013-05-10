@@ -709,7 +709,7 @@ parse_atom_test_() ->
                   parse_atom(St(["options"])))
   , ?_assertEqual({[#option{short="-v", long="--verbose", value=true}], St([])},
                   parse_atom(St(["--verbose"])))
-  , ?_assertEqual({[#option{short="-h", value=true}], St([])},
+  , ?_assertEqual({[#option{short="-h"}], St([])},
                   parse_atom(St(["-h"])))
   , ?_assertEqual({[#required{children=[#argument{name="FOO"}]}], St([])},
                   parse_atom(St(["(", "FOO", ")"])))
