@@ -371,7 +371,7 @@ parse_required(State0) ->
   debug("parse required after parse_expr ~p, ~p", [tokens(State), Expr]),
   case current(State) of
     ")" -> {[#required{children=Expr}], move(State)};
-    Res -> throw({"Unmatched '(':", Res})
+    _   -> throw("Unmatched '('")
   end.
 
 is_arg(S) ->
