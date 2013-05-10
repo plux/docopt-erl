@@ -178,7 +178,7 @@ option_parse(Str) ->
 default_value(Desc) ->
   case re:run(Desc,"\\[default: (.*)\\]", [{capture, [1], list}, caseless]) of
     {match, [DefaultValue]} -> DefaultValue;
-    nomatch                 -> false
+    nomatch                 -> undefined
   end.
 
 parse_args(Args, Options) ->
@@ -832,7 +832,7 @@ one_or_more(Children) -> #one_or_more{children=Children}.
 
 opt(Short)            -> #option{short=Short}.
 opt(Short, Long)      -> #option{short=Short, long=Long}.
-opt(Short, Long, Ac)  -> #option{short=Short, long=Long, argcount=Ac}.
+opt(Short, Long, 1)   -> #option{short=Short, long=Long, argcount=1, value=undefined}.
 
 partition_test_() ->
   [ ?_assertEqual({"foobar", ""}     , partition("foobar"      , "abc"))
@@ -843,28 +843,28 @@ partition_test_() ->
   ].
 
 option_parse_test_() ->
-  [ ?_assertEqual(#option{short="-h"}, option_parse("-h"))
-  , ?_assertEqual(#option{long="--help"}, option_parse("--help"))
-  , ?_assertEqual(#option{short="-h", long="--help"}, option_parse("-h --help"))
-  , ?_assertEqual(#option{short="-h", long="--help"}, option_parse("--help -h"))
-  , ?_assertEqual(#option{short="-h", long="--help"}, option_parse("-h,--help"))
+  [ ?_assertEqual(opt("-h"), option_parse("-h"))
+  , ?_assertEqual(opt(undefined, "--help"), option_parse("--help"))
+  , ?_assertEqual(opt("-h", "--help"), option_parse("-h --help"))
+  , ?_assertEqual(opt("-h", "--help"), option_parse("--help -h"))
+  , ?_assertEqual(opt("-h", "--help"), option_parse("-h,--help"))
 
-  , ?_assertEqual(#option{short="-h", argcount=1}, option_parse("-h TOPIC"))
-  , ?_assertEqual(#option{long="--help", argcount=1},
+  , ?_assertEqual(#option{short="-h", argcount=1, value=undefined},
+                  option_parse("-h TOPIC"))
+  , ?_assertEqual(#option{long="--help", argcount=1, value=undefined},
                   option_parse("--help TOPIC"))
-  , ?_assertEqual(#option{short="-h", long="--help", argcount=1},
+  , ?_assertEqual(#option{short="-h", long="--help", argcount=1, value=undefined},
                   option_parse("-h TOPIC --help TOPIC"))
-  , ?_assertEqual(#option{short="-h", long="--help", argcount=1},
+  , ?_assertEqual(#option{short="-h", long="--help", argcount=1, value=undefined},
                   option_parse("-h TOPIC, --help TOPIC"))
-  , ?_assertEqual(#option{short="-h", long="--help", argcount=1},
+  , ?_assertEqual(#option{short="-h", long="--help", argcount=1, value=undefined},
                   option_parse("-h TOPIC, --help=TOPIC"))
 
   , ?_assertEqual(#option{short="-h"}, option_parse("-h  Description..."))
   , ?_assertEqual(#option{short="-h", long="--help"},
                   option_parse("-h --help  Description..."))
-  , ?_assertEqual(#option{short="-h", argcount=1},
+  , ?_assertEqual(#option{short="-h", argcount=1, value=undefined},
                   option_parse("-h TOPIC  Description..."))
-
   , ?_assertEqual(#option{short="-h"}, option_parse("    -h"))
   , ?_assertEqual(#option{short="-h", argcount=1, value="2"},
                   option_parse("-h TOPIC  Descripton... [default: 2]"))
