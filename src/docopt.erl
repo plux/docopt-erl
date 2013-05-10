@@ -433,7 +433,7 @@ match_child_pattern(Pat, Rest0, Acc0) ->
   case single_match(Pat, Rest0) of
     nomatch              -> {false, Rest0, Acc0};
     {match, Match, Rest} ->
-      SameName = lists:filter(fun(P) -> name(P) == name(Pat) end, Acc0),
+      SameName = [P || P <- Acc0, name(P) == name(Pat)],
       Acc =
         case {value(Pat), SameName} of
           {0 , []}       -> [set_value(Match, 1)|Acc0];
