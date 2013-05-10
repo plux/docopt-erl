@@ -255,19 +255,28 @@ parse_shorts([H|T], State, Acc) ->
    [] when State#state.mode == parse_args ->
      throw({[$-, H], "not recognized", State});
    [] when State#state.mode == parse_pattern ->
-     %% TODO: What about value here? Probably needs to parse value...
-     Opt = #option{short=[$-, H], value=true},
-     parse_shorts(T, State#state{options=[Opt|options(State)]}, [Opt|Acc]);
+     Opt = option([$-, H]),
+     parse_shorts(T, add_option(State, Opt), [Opt|Acc]);
    Opt when length(Opt) > 1 -> throw({[$-, H], "specified ambiguously"});
    [Opt] when Opt#option.argcount == 0 ->
-     parse_shorts(T, State, [Opt#option{value = true}|Acc]);
+     Value = mode(State) == parse_args,
+     parse_shorts(T, State, [Opt#option{value = Value}|Acc]);
    [Opt] ->
      {Value, Rest} = get_value_shorts(H, T, State),
      {[Opt#option{value = Value}], Rest}
  end.
 
-get_value_shorts(H, [], [])     -> throw({H, "requires an argument"});
-get_value_shorts(_, [], State)  -> {current(State), move(State)};
+add_option(State, Option) ->
+  State#state{options=[Option|options(State)]}.
+
+option(ShortName) ->
+  #option{short = ShortName, argcount = 0, long = undefined, value = false}.
+
+get_value_shorts(H, [], State) ->
+  case current(State) of
+    []      -> throw({H, "requires an argument"});
+    Current -> {Current, move(State)}
+  end;
 get_value_shorts(_, Arg, State) -> {Arg, State}.
 
 printable_usage(Doc) ->
