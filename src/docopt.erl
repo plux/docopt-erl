@@ -945,6 +945,103 @@ strip_test_() ->
   , ?_assertEqual("foo bar", strip("  \n  \n  \nfoo bar \n \n"))
   ].
 
+matching_paren_test_() ->
+  [ ?_assertThrow("Unmatched '['", docopt("Usage: prog [a [b]", []))
+  , ?_assertThrow("Unmatched '('", docopt("Usage: [a [b] ] c)", []))
+  ].
+
+bug_not_list_argument_if_nothing_matched_test_() ->
+  D = "Usage: prog [NAME [NAME ...]]",
+  [ ?_assertEqual([{"NAME", ["a", "b"]}], docopt(D, "a b"))
+  %% TODO:
+  %%, ?_assertEqual([{"NAME", []}]        , docopt(D, ""))
+  ].
+
+pattern_flat_test() ->
+  ?assertEqual([arg("N"), opt("-a"), arg("M")],
+               flatten(req([one_or_more([arg("N")]), opt("-a"), arg("M")]))).
+
+bug_test_() ->
+  [ ?_assertEqual([], docopt("usage: prog", ""))
+  , ?_assertEqual([{"<a>", "1"}, {"<b>", "2"}],
+                  docopt("usage: prog \n prog <a> <b>", "1 2"))
+  , ?_assertEqual([{"<a>", undefined}, {"<b>", undefined}],
+                  docopt("usage: prog \n prog <a> <b>", ""))
+  , ?_assertEqual([{"<a>", undefined}, {"<b>", undefined}],
+                  docopt("usage: prog <a> <b> \n prog", ""))
+  ].
+
+issue40_test_() ->
+  [ ?_assertEqual(orddict:from_list([{"--aabb", false}, {"--aa", true}]),
+                  docopt("usage: prog --aabb | --aa", "--aa"))
+%% TODO: ?
+%%, ?_assertThrow(_, docopt("usage: prog --help-commands | --help", "--help"))
+  ].
+
+count_multiple_flags_test_() ->
+  [ ?_assertEqual([{"-v", true}] , docopt("usage: prog [-v]", "-v"))
+  , ?_assertEqual([{"-v", false}], docopt("usage: prog [-v]", ""))
+  %% TODO:
+  %% %%?_assertEqual([{"-v", 0}]    , docopt("usage: prog [-vv]", ""))
+  , ?_assertEqual([{"-v", 1}]    , docopt("usage: prog [-vv]", "-v"))
+  , ?_assertEqual([{"-v", 2}]    , docopt("usage: prog [-vv]", "-vv"))
+  , ?_assertThrow(_              , docopt("usage: prog [-vv]", "-vvv"))
+  , ?_assertEqual([{"-v", 3}]    , docopt("usage: prog [-v | -vv | -vvv]", "-vvv"))
+  %, ?_assertEqual([{"-v", 0}]    , docopt("usage: prog -v...", ""))
+  , ?_assertEqual([{"-v", 6}]    , docopt("usage: prog -v...", "-vvvvvv"))
+  , ?_assertEqual([{"--ver", 2}] , docopt("usage: prog [--ver --ver]", "--ver --ver"))
+  ].
+
+count_multiple_commands_test_() ->
+  [ ?_assertEqual([{"go", true}], docopt("usage: prog [go]", "go"))
+%%  TODO:
+  %%, ?_assertEqual([{"go", 0}], docopt("usage: prog [go go]", ""))
+  , ?_assertEqual([{"go", 1}], docopt("usage: prog [go go]", "go"))
+  , ?_assertEqual([{"go", 2}], docopt("usage: prog [go go]", "go go"))
+  , ?_assertThrow(_, docopt("usage: prog [go go]", "go go go"))
+  , ?_assertEqual([{"go", 5}], docopt("usage: prog go...", "go go go go go"))
+  ].
+
+accumulate_multiple_options_test_() ->
+  [ ?_assertEqual([{"--long", ["one"]}],
+                  docopt("usage: prog --long=<arg> ...", "--long one"))
+  , ?_assertEqual([{"--long", ["one", "two"]}],
+                  docopt("usage: prog --long=<arg> ...", "--long one --long two"))
+  ].
+
+multiple_different_elements_test_() ->
+  [ ?_assertEqual(
+       [{"--speed", ["5", "9"]}, {"<direction>", ["left", "right"]}, {"go", 2}],
+       docopt("usage: prog (go <direction> --speed=<km/h>)...",
+              "go left --speed=5  go right --speed=9"))
+  ].
+
+bug_option_argument_should_not_capture_default_value_from_pattern_test_() ->
+  Doc = "Usage: tau [-a <host:port>]
+
+    -a, --address <host:port>  TCP address [default: localhost:6283].
+
+    ",
+  [ ?_assertEqual([{"--file", false}], docopt("usage: prog [--file=<f>]", ""))
+  , ?_assertEqual([{"--file", undefined}],
+                  docopt("usage: prog [--file=<f>]\n\n--file <a>", ""))
+  , ?_assertEqual([{"--address", "localhost:6283"}], docopt(Doc, ""))
+  ].
+
+language_errors_test_() ->
+  [ ?_assertThrow(_, docopt("no usage with colon here", ""))
+  , ?_assertThrow(_, docopt("usage: here \n\n and again usage: here", ""))
+  ].
+
+option_arguments_default_to_undefined_test() ->
+  D = "usage: prog [options]
+
+    -a        Add
+    -m <msg>  Message
+
+    ",
+  ?assertEqual([{"-a", true}, {"-m", undefined}], docopt(D, "-a")).
+
 %%%_* Emacs ===================================================================
 %%% Local Variables:
 %%% allout-layout: t
