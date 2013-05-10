@@ -49,10 +49,10 @@
 
 -spec docopt(string(), string()) -> orddict:orddict().
 docopt(Doc, Args) ->
-  Usage      = printable_usage(Doc),
-  Options    = parse_doc_options(Doc),
-  Pattern    = parse_pattern(formal_usage(Usage), Options),
-  ParsedArgs = parse_args(Args, Options),
+  Usage           = printable_usage(Doc),
+  Opts0           = parse_doc_options(Doc),
+  {Pattern, Opts} = parse_pattern(formal_usage(Usage), Opts0),
+  ParsedArgs      = parse_args(Args, Opts),
   case match(fix_list_arguments(Pattern), ParsedArgs) of
     {true, [], Collected} ->
       ct:pal("\n"
@@ -63,7 +63,7 @@ docopt(Doc, Args) ->
              "parsedargs: ~p\n"
              "collected:  ~p\n"
              "flat patns: ~p\n",
-         [Args,Usage,Options,Pattern,ParsedArgs,Collected,flatten(Pattern)]),
+         [Args,Usage,Opts,Pattern,ParsedArgs,Collected,flatten(Pattern)]),
       lists:foldl(fun (Pat, Acc) ->
                       orddict:store(name(Pat), value(Pat), Acc)
                   end, orddict:new(), flatten(Pattern) ++ Options ++ Collected);
@@ -291,12 +291,13 @@ parse_pattern(Source0, Options) ->
   %% Add spaces around []()| and ...
   Source = re:replace(Source0, "([\\[\\]\\(\\)\\|]|\\.\\.\\.)", " \\1 ",
                       [{return, list}, global]),
-  State = #state{ tokens  = string:tokens(Source, " ")
-                , options = Options
-                , mode    = parse_pattern
-                },
-  {Result, _} = parse_expr(State),
-  #required{children=Result}.
+  State0 = #state{ tokens  = string:tokens(Source, " ")
+                 , options = Options
+                 , mode    = parse_pattern
+                 },
+  {Result, State} = parse_expr(State0),
+  ct:pal("state; ~p", [State]),
+  {#required{children=Result}, options(State)}.
 
 % expr ::= seq ( '|' seq )* ;
 parse_expr(State0) ->
@@ -752,59 +753,63 @@ parse_args_test_() ->
   ].
 
 parse_pattern_test_() ->
-  HelpOpt    = #option{short="-h", value=true},
+  HelpOpt    = #option{short="-h"},
   FileOpt    = #option{short="-f", long="--file", argcount=1, value="<f>"},
-  VerboseOpt = #option{short="-v", long="--verbose", value=true},
+  VerboseOpt = #option{short="-v", long="--verbose"},
   O = [opt("-h"), opt("-v", "--verbose"), opt("-f", "--file", 1)],
+  ParsePattern = fun (Str, Opts) ->
+                     {Pattern, _} = parse_pattern(Str, Opts),
+                     Pattern
+                 end,
   [ ?_assertEqual(
        req([optional([HelpOpt])]),
-       parse_pattern("[ -h ]", O))
+       ParsePattern("[ -h ]", O))
   , ?_assertEqual(
-       req([optional([HelpOpt])]),
-       parse_pattern("[ -h ]", []))
+       req([optional([#option{short="-h"}])]),
+       ParsePattern("[ -h ]", []))
   , ?_assertEqual(
        req([optional([#option{long="--verbose", value=true}])]),
-       parse_pattern("[ --verbose ]", []))
+       ParsePattern("[ --verbose ]", []))
   , ?_assertEqual(
        req([optional([one_or_more([arg("ARG")])])]),
-       parse_pattern("[ ARG ... ]", O))
+       ParsePattern("[ ARG ... ]", O))
   , ?_assertEqual(
        req([optional([either([HelpOpt, VerboseOpt])])]),
-       parse_pattern("[ -h | -v ]", O))
+       ParsePattern("[ -h | -v ]", O))
   , ?_assertEqual(
        req([VerboseOpt, optional([FileOpt])]),
-       parse_pattern("-v [ --file <f> ]", O))
+       ParsePattern("-v [ --file <f> ]", O))
   , ?_assertEqual(
        req([optional([either([arg("M"), req([either([arg("K"),
                                                      arg("L")])])])])]),
-       parse_pattern("[M | (K | L)]", O))
+       ParsePattern("[M | (K | L)]", O))
   , ?_assertEqual(
        req([arg("N"), arg("M")]),
-       parse_pattern("N M", O))
+       ParsePattern("N M", O))
   , ?_assertEqual(
        req([arg("N"), optional([arg("M")])]),
-       parse_pattern("N [M]", O))
+       ParsePattern("N [M]", O))
   , ?_assertEqual(
        req([arg("N"), optional([either([arg("M"), arg("K"), arg("L")])])]),
-       parse_pattern("N [M | K | L]", O))
+       ParsePattern("N [M | K | L]", O))
   , ?_assertEqual(
        req([optional([HelpOpt]), optional([arg("N")])]),
-       parse_pattern("[ -h ] [N]", O))
+       ParsePattern("[ -h ] [N]", O))
   , ?_assertEqual(
        req([optional(lists:reverse(O))]),
-       parse_pattern("[options]", O))
+       ParsePattern("[options]", O))
   , ?_assertEqual(
        req([arg("ADD")]),
-       parse_pattern("ADD", O))
+       ParsePattern("ADD", O))
   , ?_assertEqual(
        req([arg("<add>")]),
-       parse_pattern("<add>", O))
+       ParsePattern("<add>", O))
   , ?_assertEqual(
        req([cmd("add")]),
-       parse_pattern("add", O))
+       ParsePattern("add", O))
   , ?_assertEqual(
        req([req([either([HelpOpt, req([VerboseOpt, optional([arg("A")])])])])]),
-       parse_pattern("( -h | -v [ A ] )", O))
+       ParsePattern("( -h | -v [ A ] )", O))
   , ?_assertEqual(
        req([req([either([req([arg("N"),
                               optional([either([arg("M"),
