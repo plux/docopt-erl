@@ -548,21 +548,23 @@ basic_pattern_matching_test_() ->
                     match(P, [opt("-x"), arg(9), arg(5)]))}
   ].
 
-%% TODO:
-%% allow_double_dash_test_() ->
-%%   Doc = "Usage: prog [-o] [--] <arg>
+allow_double_dash_test_() ->
+  Doc = "Usage: prog [-o] [--] <arg>
 
-%%          -o",
-%%   D = fun(L) -> orddict:from_list(L) end,
-%%   [ ?_assertEqual(D([{"-o", false}, {"<arg>", "-o"}, {"--", true}]),
-%%                   docopt(Doc, "-- -o"))
-%%   ].
+         -o",
+  D = fun(L) -> orddict:from_list(L) end,
+  [ ?_assertEqual(D([{"-o", false}, {"<arg>", "-o"}, {"--", true}]),
+                  docopt(Doc, "-- -o"))
+  , ?_assertEqual(D([{"-o", true}, {"<arg>", "1"}, {"--", false}]),
+                  docopt(Doc, "-o 1"))
+  , ?_assertThrow(parse_failure,
+                  docopt("Usage: prog [-o] <arg>\n\n-o", "-- -o"))
+  ].
 
-%% TODO:
-%% allow_single_dash_test_() ->
-%%   [ ?_assertEqual([{"-", true}], docopt("usage: prog [-]", "-"))
-%%   , ?_assertEqual([{"-", false}], docopt("usage: prog [-]", ""))
-%%   ].
+allow_single_dash_test_() ->
+  [ ?_assertEqual([{"-", true}] , docopt("usage: prog [-]", "-"))
+  , ?_assertEqual([{"-", false}], docopt("usage: prog [-]", ""))
+  ].
 
 allow_empty_pattern_test() ->
   ?assertEqual([], docopt("usage: prog", "")).
