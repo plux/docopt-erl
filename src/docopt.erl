@@ -66,8 +66,8 @@ docopt(Doc, Args) ->
          [Args,Usage,Opts,Pattern,ParsedArgs,Collected,flatten(Pattern)]),
       lists:foldl(fun (Pat, Acc) ->
                       orddict:store(name(Pat), value(Pat), Acc)
-                  end, orddict:new(), flatten(Pattern) ++ Options ++ Collected);
-    Res -> {error, {"failed to parse :(", Res}}
+                  end, orddict:new(), flatten(Pattern) ++ Opts ++ Collected);
+    _Res -> throw(parse_failure)
   end.
 
 fix_list_arguments(Pat) ->
