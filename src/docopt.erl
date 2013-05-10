@@ -605,6 +605,23 @@ docopt_test_() ->
   %% TODO: Assert exceptions
   ].
 
+%% TODO: If argcount = 1, default should be undefined, not false
+docopt_options_without_description_test() ->
+  [ ?_assertEqual([{"--hello", true}], docopt("usage: prog --hello", "--hello"))
+  , ?_assertEqual([{"--hello", false}], docopt("usage: prog [--hello=<world>]", ""))
+  , ?_assertEqual([{"--hello", "wrld"}],
+                  docopt("usage: prog [--hello=<world>]", "--hello wrld"))
+  , ?_assertEqual([{"-o", false}], docopt("usage: prog [-o]", ""))
+  , ?_assertEqual([{"-o", true}], docopt("usage: prog [-o]", "-o"))
+  , ?_assertEqual([{"-o", true}, {"-p", true}, {"-r", false}],
+                  docopt("usage: prog [-opr]", "-op"))
+  , ?_assertEqual([{"-v", true}, {"--verbose", false}],
+                  docopt("usage: git [-v | --versbose]", "-v"))
+  , ?_assertEqual([{"remote", true}, {"-v", true}, {"--verbose", false}],
+                  docopt("usage: git remote [-v | --verbose]", "remote -v"))
+
+  ].
+
 match_option_test_() ->
   A  = opt("-a"),
   AT = A#option{value = true},
@@ -692,12 +709,22 @@ match_either_test_() ->
 
 match_one_or_more_test_() ->
   A  = arg("A"),
-  AV = arg("A", 9),
-  V  = arg(undefined, 9),
+  A8 = arg("A", 8),
+  A9 = arg("A", 9),
+  V8 = arg(undefined, 8),
+  V9 = arg(undefined, 9),
+  %%OA = opt("-a"),
   OX = opt("-x"),
-  [ ?_assertEqual({true , []  , [AV]}, match(one_or_more([A]), [V]))
+  [ ?_assertEqual({true , []  , [A9]}, match(one_or_more([A]), [V9]))
   , ?_assertEqual({false, []  , []}  , match(one_or_more([A]), []))
   , ?_assertEqual({false, [OX], []}  , match(one_or_more([A]), [OX]))
+  , ?_assertEqual({true, [], [A9, A8]}, match(one_or_more([A]), [V9, V8]))
+  , ?_assertEqual({true, [OX], [A9, A8]}, match(one_or_more([A]), [V9, OX, V8]))
+  %% TODO:
+  , ?_assertEqual({true, [V8], [OX, OX]}, match(one_or_more([A]), [OX, V8, OX]))
+  %%, ?_assertEqual({false, [V8, OX], []}, match(one_or_more([A]), [V8, OX]))
+  %% TODO: Missing TESTS!
+  %%, ?_assertEqual({true, [], [A9]}, match(one_or_more([optional([A])]), [V9]))
   ].
 
 parse_atom_test_() ->
