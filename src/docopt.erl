@@ -713,18 +713,19 @@ match_one_or_more_test_() ->
   A9 = arg("A", 9),
   V8 = arg(undefined, 8),
   V9 = arg(undefined, 9),
-  %%OA = opt("-a"),
+  OA = opt("-a"),
   OX = opt("-x"),
   [ ?_assertEqual({true , []  , [A9]}, match(one_or_more([A]), [V9]))
   , ?_assertEqual({false, []  , []}  , match(one_or_more([A]), []))
   , ?_assertEqual({false, [OX], []}  , match(one_or_more([A]), [OX]))
   , ?_assertEqual({true, [], [A9, A8]}, match(one_or_more([A]), [V9, V8]))
   , ?_assertEqual({true, [OX], [A9, A8]}, match(one_or_more([A]), [V9, OX, V8]))
-  %% TODO:
-  , ?_assertEqual({true, [V8], [OX, OX]}, match(one_or_more([A]), [OX, V8, OX]))
-  %%, ?_assertEqual({false, [V8, OX], []}, match(one_or_more([A]), [V8, OX]))
-  %% TODO: Missing TESTS!
-  %%, ?_assertEqual({true, [], [A9]}, match(one_or_more([optional([A])]), [V9]))
+  , ?_assertEqual({true, [V8], [OA, OA]},
+                  match(one_or_more([OA]), [OA, V8, OA]))
+  , ?_assertEqual({false, [V8, OX], []}, match(one_or_more([OA]), [V8, OX]))
+  , ?_assertEqual({true, [OX], [OA, A8, OA, A9]},
+                  match(one_or_more([req([OA, A])]), [OA, V8, OX, OA, V9]))
+  , ?_assertEqual({true, [], [A9]}, match(one_or_more([optional([A])]), [V9]))
   ].
 
 parse_atom_test_() ->
