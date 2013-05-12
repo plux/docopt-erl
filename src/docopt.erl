@@ -49,31 +49,38 @@
 
 -spec docopt(string(), string()) -> orddict:orddict().
 docopt(Doc, Args) ->
-  Usage           = printable_usage(Doc),
-  Opts0           = parse_doc_options(Doc),
-  {Pattern, Opts} = parse_pattern(formal_usage(Usage), Opts0),
-  ParsedArgs      = parse_args(Args, Opts),
-  case match(fix_list_arguments(Pattern), ParsedArgs) of
+  Usage                = printable_usage(Doc),
+  Opts0                = parse_doc_options(Doc),
+  {Pattern, Opts1}     = parse_pattern(formal_usage(Usage), Opts0),
+  ParsedArgs           = parse_args(Args, Opts1),
+  {FixedPattern, Opts} = fix_list_arguments(Pattern, Opts1),
+  case match(FixedPattern, ParsedArgs) of
     {true, [], Collected} ->
       ct:pal("\n"
              "args:       ~p\n"
              "usage:      ~p\n"
              "options:    ~p\n"
              "pattern:    ~p\n"
+             "fixd patns: ~p\n"
              "parsedargs: ~p\n"
              "collected:  ~p\n"
              "flat patns: ~p\n",
-         [Args,Usage,Opts,Pattern,ParsedArgs,Collected,flatten(Pattern)]),
+         [Args,Usage,Opts,Pattern,FixedPattern,ParsedArgs,Collected,
+          flatten(FixedPattern)]),
       lists:foldl(fun (Pat, Acc) ->
                       orddict:store(name(Pat), value(Pat), Acc)
-                  end, orddict:new(), flatten(Pattern) ++ Opts ++ Collected);
+                  end,
+                  orddict:new(),
+                  flatten(FixedPattern) ++ Opts ++ Collected);
     _Res -> throw(parse_failure)
   end.
 
-fix_list_arguments(Pat) ->
-  Either   = [children(C) || C <- children(fix_either(Pat))],
-  FixThese = [E || Case <- Either, E <- Case, count(E, Case) > 1],
-  do_fix_list_arguments(Pat, FixThese).
+fix_list_arguments(Pat, Opts) ->
+  Either    = [children(C) || C <- children(fix_either(Pat))],
+  FixThese  = [E || Case <- Either, E <- Case, count(E, Case) > 1],
+  FixedPat  = do_fix_list_arguments(Pat, FixThese),
+  FixedOpts = [do_fix_list_arguments(Opt, FixThese) || Opt <- Opts],
+  {FixedPat, FixedOpts}.
 
 count(X, Patterns) ->
   length([P || P <- Patterns, X == P]).
@@ -223,8 +230,8 @@ parse_long(State0) ->
   {Opt, State} = case {mode(State0), Opt1} of
                    {parse_pattern, []} ->
                      O = case Value == [] of
-                           true  -> #option{long=Raw, argcount=0};
-                           false -> #option{long=Raw, argcount=1}
+                           true  -> #option{long=Raw, argcount=0, value=false};
+                           false -> #option{long=Raw, argcount=1, value=undefined}
                          end,
                      {O, move(State0#state{options=[O|options(State0)]})};
                    {parse_args, []} -> throw({Raw, "not recognized"});
@@ -261,7 +268,7 @@ parse_shorts([H|T], State, Acc) ->
    [Opt] when Opt#option.argcount == 0 ->
      Value = mode(State) == parse_args,
      parse_shorts(T, State, [Opt#option{value = Value}|Acc]);
-   [Opt] ->
+   [Opt] when Opt#option.argcount == 1 ->
      {Value, Rest} = get_value_shorts(H, T, State),
      {[Opt#option{value = Value}], Rest}
  end.
@@ -609,19 +616,19 @@ docopt_test_() ->
   %% TODO: Assert exceptions
   ].
 
-%% TODO: If argcount = 1, default should be undefined, not false
-docopt_options_without_description_test() ->
+docopt_options_without_description_test_() ->
   [ ?_assertEqual([{"--hello", true}], docopt("usage: prog --hello", "--hello"))
-  , ?_assertEqual([{"--hello", false}], docopt("usage: prog [--hello=<world>]", ""))
+  , ?_assertEqual([{"--hello", undefined}],
+                  docopt("usage: prog [--hello=<world>]", ""))
   , ?_assertEqual([{"--hello", "wrld"}],
                   docopt("usage: prog [--hello=<world>]", "--hello wrld"))
   , ?_assertEqual([{"-o", false}], docopt("usage: prog [-o]", ""))
   , ?_assertEqual([{"-o", true}], docopt("usage: prog [-o]", "-o"))
   , ?_assertEqual([{"-o", true}, {"-p", true}, {"-r", false}],
                   docopt("usage: prog [-opr]", "-op"))
-  , ?_assertEqual([{"-v", true}, {"--verbose", false}],
-                  docopt("usage: git [-v | --versbose]", "-v"))
-  , ?_assertEqual([{"remote", true}, {"-v", true}, {"--verbose", false}],
+  , ?_assertEqual([{"--verbose", false}, {"-v", true}],
+                  docopt("usage: git [-v | --verbose]", "-v"))
+  , ?_assertEqual([{"--verbose", false}, {"-v", true}, {"remote", true}],
                   docopt("usage: git remote [-v | --verbose]", "remote -v"))
 
   ].
@@ -952,7 +959,10 @@ name_test_() ->
   ].
 
 list_argument_match_test_() ->
-  M = fun (Pat, Args) -> match(fix_list_arguments(Pat), Args) end,
+  M = fun (Pat, Args) ->
+          {Fixed, _} = fix_list_arguments(Pat, []),
+          match(Fixed, Args)
+      end,
   [ ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
                   M(req([arg("N"), arg("N")]),
                     [arg(undefined, "1"), arg(undefined, "2")]))
@@ -974,7 +984,10 @@ list_argument_match_test_() ->
   ].
 
 fix_list_arguments_test_() ->
-  Fix = fun fix_list_arguments/1,
+  Fix = fun(Pat) ->
+            {Fixed, _} = fix_list_arguments(Pat, []),
+            Fixed
+        end,
   [ ?_assertEqual(opt("-a"), Fix(opt("-a")))
   , ?_assertEqual(arg("N", undefined), Fix(arg("N", undefined)))
   , ?_assertEqual(req([arg("N", []), arg("N", [])]),
@@ -999,8 +1012,7 @@ matching_paren_test_() ->
 bug_not_list_argument_if_nothing_matched_test_() ->
   D = "Usage: prog [NAME [NAME ...]]",
   [ ?_assertEqual([{"NAME", ["a", "b"]}], docopt(D, "a b"))
-  %% TODO:
-  %%, ?_assertEqual([{"NAME", []}]        , docopt(D, ""))
+  , ?_assertEqual([{"NAME", []}]        , docopt(D, ""))
   ].
 
 pattern_flat_test() ->
@@ -1027,21 +1039,19 @@ issue40_test_() ->
 count_multiple_flags_test_() ->
   [ ?_assertEqual([{"-v", true}] , docopt("usage: prog [-v]", "-v"))
   , ?_assertEqual([{"-v", false}], docopt("usage: prog [-v]", ""))
-  %% TODO:
-  %% %%?_assertEqual([{"-v", 0}]    , docopt("usage: prog [-vv]", ""))
+  , ?_assertEqual([{"-v", 0}]    , docopt("usage: prog [-vv]", ""))
   , ?_assertEqual([{"-v", 1}]    , docopt("usage: prog [-vv]", "-v"))
   , ?_assertEqual([{"-v", 2}]    , docopt("usage: prog [-vv]", "-vv"))
   , ?_assertThrow(_              , docopt("usage: prog [-vv]", "-vvv"))
   , ?_assertEqual([{"-v", 3}]    , docopt("usage: prog [-v | -vv | -vvv]", "-vvv"))
-  %, ?_assertEqual([{"-v", 0}]    , docopt("usage: prog -v...", ""))
   , ?_assertEqual([{"-v", 6}]    , docopt("usage: prog -v...", "-vvvvvv"))
+  , ?_assertEqual([{"-v", 0}]    , docopt("usage: prog [-v...]", ""))
   , ?_assertEqual([{"--ver", 2}] , docopt("usage: prog [--ver --ver]", "--ver --ver"))
   ].
 
 count_multiple_commands_test_() ->
   [ ?_assertEqual([{"go", true}], docopt("usage: prog [go]", "go"))
-%%  TODO:
-  %%, ?_assertEqual([{"go", 0}], docopt("usage: prog [go go]", ""))
+  , ?_assertEqual([{"go", 0}], docopt("usage: prog [go go]", ""))
   , ?_assertEqual([{"go", 1}], docopt("usage: prog [go go]", "go"))
   , ?_assertEqual([{"go", 2}], docopt("usage: prog [go go]", "go go"))
   , ?_assertThrow(_, docopt("usage: prog [go go]", "go go go"))
@@ -1068,7 +1078,8 @@ bug_option_argument_should_not_capture_default_value_from_pattern_test_() ->
     -a, --address <host:port>  TCP address [default: localhost:6283].
 
     ",
-  [ ?_assertEqual([{"--file", false}], docopt("usage: prog [--file=<f>]", ""))
+  [ ?_assertEqual([{"--file", undefined}],
+                  docopt("usage: prog [--file=<f>]", ""))
   , ?_assertEqual([{"--file", undefined}],
                   docopt("usage: prog [--file=<f>]\n\n--file <a>", ""))
   , ?_assertEqual([{"--address", "localhost:6283"}], docopt(Doc, ""))
