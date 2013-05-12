@@ -438,8 +438,12 @@ match_one_or_more(#one_or_more{children=[Child]}, Rest0, Acc0) ->
 
 consume_one_or_more(Pat, Rest0, Acc0) ->
   case match(Pat, Rest0, Acc0) of
-    {true, Rest, Acc}  -> consume_one_or_more(Pat, Rest, Acc);
-    {false, Rest, Acc} -> {Rest, Acc}
+    {true, Rest0, Acc0} ->
+      {Rest0, Acc0};
+    {true, Rest, Acc}  ->
+      consume_one_or_more(Pat, Rest, Acc);
+    {false, Rest, Acc} ->
+      {Rest, Acc}
   end.
 
 match_child_pattern(Pat, Rest0, Acc0) ->
