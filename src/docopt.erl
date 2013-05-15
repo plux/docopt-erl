@@ -56,7 +56,7 @@ docopt(Doc, Args) ->
   {FixedPattern, Opts} = fix_list_arguments(Pattern, Opts1),
   case match(FixedPattern, ParsedArgs) of
     {true, [], Collected} ->
-      ct:pal("\n"
+      debug("\n"
              "args:       ~p\n"
              "usage:      ~p\n"
              "options:    ~p\n"
@@ -314,7 +314,7 @@ parse_pattern(Source0, Options) ->
                  , mode    = parse_pattern
                  },
   {Result, State} = parse_expr(State0),
-  ct:pal("state; ~p", [State]),
+  debug("state; ~p", [State]),
   {#required{children=Result}, options(State)}.
 
 % expr ::= seq ( '|' seq )* ;
