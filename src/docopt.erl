@@ -476,12 +476,6 @@ replace(_Old, New, [])     -> [New];
 replace(Old, New, [Old|T]) -> [New|T];
 replace(Old, New, [H|T])   -> [H|replace(Old, New, T)].
 
-replace_test() ->
-  ?assertEqual([a,2,3], replace(1, a, [1,2,3])),
-  ?assertEqual([a]    , replace(1, a, [])),
-  ?assertEqual([2,3,a], replace(1, a, [2,3])),
-  ?assertEqual([1,b,3], replace(2, b, [1,2,3])).
-
 single_match(Pat, Rest) ->
   case lists:filter(match_fun(Pat), Rest) of
     []        -> nomatch;
@@ -518,6 +512,13 @@ debug(_Fmt, _Args) -> ok.
 -endif.
 
 %%%_* Tests ===================================================================
+
+replace_test_() ->
+  [ ?_assertEqual([a,2,3], replace(1, a, [1,2,3]))
+  , ?_assertEqual([a]    , replace(1, a, []))
+  , ?_assertEqual([2,3,a], replace(1, a, [2,3]))
+  , ?_assertEqual([1,b,3], replace(2, b, [1,2,3]))
+  ].
 
 docopt_any_options_test_() ->
   Doc = "Usage: prog [options] A
