@@ -270,7 +270,7 @@ parse_shorts([H|T], State, Acc) ->
      parse_shorts(T, State, [Opt#option{value = Value}|Acc]);
    [Opt] when Opt#option.argcount == 1 ->
      {Value, Rest} = get_value_shorts(H, T, State),
-     {[Opt#option{value = Value}], Rest}
+     {[Opt#option{value = Value}|Acc], Rest}
  end.
 
 add_option(State, Option) ->
@@ -468,7 +468,6 @@ match_child_pattern(Pat, Rest0, Acc0) ->
           _              -> [Match|Acc0]
         end,
       {true, Rest, Acc}
-
   end.
 
 replace(_Old, New, [])     -> [New];
@@ -1098,6 +1097,16 @@ option_arguments_default_to_undefined_test() ->
 
     ",
   ?assertEqual([{"-a", true}, {"-m", undefined}], docopt(D, "-a")).
+
+options_with_trailing_argument_test() ->
+  D = "usage: prog [options]
+
+    -b       B
+    -a       A
+    -z <zs>  Z
+
+    ",
+  ?assertEqual([{"-a", true}, {"-b", true}, {"-z", "ar"}], docopt(D, "-bazar")).
 
 %%%_* Emacs ===================================================================
 %%% Local Variables:
