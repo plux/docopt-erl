@@ -438,9 +438,11 @@ most_consumed({_, R, _}=Res, {_, Min, _}) when length(R) < length(Min) -> Res;
 most_consumed({_, _, _}    , Acc)                                      -> Acc.
 
 match_one_or_more(#one_or_more{children=[Child]}, Rest0, Acc0) ->
+  %% If the child is optional we do not need to consume anything
+  ConsumptionNotRequired = is_record(Child, optional),
   case consume_one_or_more(Child, Rest0, Acc0) of
-    {Rest0, Acc0} -> {false, Rest0, Acc0};
-    {Rest, Acc}   -> {true, Rest, Acc}
+    {Rest0 , Acc0} -> {ConsumptionNotRequired , Rest0 , Acc0};
+    {Rest  , Acc}  -> {true                   , Rest  , Acc }
   end.
 
 consume_one_or_more(Pat, Rest0, Acc0) ->
@@ -1107,6 +1109,9 @@ options_with_trailing_argument_test() ->
 
     ",
   ?assertEqual([{"-a", true}, {"-b", true}, {"-z", "ar"}], docopt(D, "-bazar")).
+
+one_or_more_optional_arguments_test() ->
+  ?assertEqual([{"NAME", ""}], docopt("usage: prog [NAME]...", "")).
 
 %%%_* Emacs ===================================================================
 %%% Local Variables:
