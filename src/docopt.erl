@@ -738,6 +738,7 @@ match_one_or_more_test_() ->
   , ?_assertEqual({true, [OX], [OA, A8, OA, A9]},
                   match(one_or_more([req([OA, A])]), [OA, V8, OX, OA, V9]))
   , ?_assertEqual({true, [], [A9]}, match(one_or_more([optional([A])]), [V9]))
+  , ?_assertEqual({true, [], []}, match(one_or_more([optional([A])]), []))
   ].
 
 parse_atom_test_() ->
