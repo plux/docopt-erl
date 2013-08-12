@@ -10,16 +10,16 @@
 
 %%%_* Records =================================================================
 
--record(state, { options = [] :: [child_pattern()]
+-record(state, { options = [] :: options()
                , tokens  = [] :: [string()]
                , mode         :: parse_mode()
                }).
 
 %% Parent patterns
--record(one_or_more , {children :: [pattern()]}).
--record(required    , {children :: [pattern()]}).
--record(optional    , {children :: [pattern()]}).
--record(either      , {children :: [pattern()]}).
+-record(one_or_more , {children :: patterns()}).
+-record(required    , {children :: patterns()}).
+-record(optional    , {children :: patterns()}).
+-record(either      , {children :: patterns()}).
 
 %% Child patterns
 -record(command  , {name :: string(), value = false     :: any()}).
@@ -31,6 +31,11 @@
                    }).
 
 %%%_* Types ===================================================================
+-type state()  :: #state{}.
+
+-type options() :: [#option{}].
+
+-type patterns() :: [pattern()].
 
 -type pattern() :: child_pattern() | parent_pattern().
 
