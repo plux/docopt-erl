@@ -683,6 +683,25 @@ docopt_test_() ->
   %% TODO: Assert exceptions
   ].
 
+docopt_short_options_error_handling_test_() ->
+  %% TODO: Test for more specific errors
+  [ ?_assertThrow(_, docopt("Usage: prog -x\n\n-x  this\n-x  that", ""))
+  , ?_assertThrow(_, docopt("Usage: prog", "-x"))
+  , ?_assertThrow(_, docopt("Usage: prog -o\n\n-o ARG", ""))
+  %%, ?_assertThrow(_, docopt("Usage: prog -o ARG\n\n-o ARG", "-o"))
+  ].
+
+docopt_long_options_error_handling_test_() ->
+  %% TODO: Test for more specific errors
+  [ ?_assertThrow(_, docopt("Usage: prog", "--non-existent"))
+  , ?_assertThrow(_, docopt("Usage: prog [--version --verbose]\n\n"
+                            "--version\n--verbose", "--ver"))
+  , ?_assertThrow(_, docopt("Usage: prog --long\n\n--long ARG", ""))
+  , ?_assertThrow(_, docopt("Usage: prog --long ARG\n\n--long ARG", "--long"))
+  , ?_assertThrow(_, docopt("Usage: prog --long=ARG\n\n--long", ""))
+  , ?_assertThrow(_, docopt("Usage: prog --long\n\n--long", "--long=ARG"))
+  ].
+
 docopt_options_without_description_test_() ->
   [ ?_assertEqual([{"--hello", true}], docopt("usage: prog --hello", "--hello"))
   , ?_assertEqual([{"--hello", undefined}],
