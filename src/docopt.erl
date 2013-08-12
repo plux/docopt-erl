@@ -697,7 +697,6 @@ docopt_options_without_description_test_() ->
                   docopt("usage: git [-v | --verbose]", "-v"))
   , ?_assertEqual([{"--verbose", false}, {"-v", true}, {"remote", true}],
                   docopt("usage: git remote [-v | --verbose]", "remote -v"))
-
   ].
 
 match_option_test_() ->
