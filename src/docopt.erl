@@ -80,6 +80,7 @@ docopt(Doc, Args) ->
     _Res -> throw(parse_failure)
   end.
 
+-spec fix_list_arguments(pattern(), options()) -> {pattern(), options()}.
 fix_list_arguments(Pat, Opts) ->
   Either    = [children(C) || C <- children(fix_either(Pat))],
   FixThese  = [E || Case <- Either, E <- Case, count(E, Case) > 1],
@@ -87,9 +88,11 @@ fix_list_arguments(Pat, Opts) ->
   FixedOpts = [do_fix_list_arguments(Opt, FixThese) || Opt <- Opts],
   {FixedPat, FixedOpts}.
 
+-spec count(any(), list()) -> non_neg_integer().
 count(X, Patterns) ->
   length([P || P <- Patterns, X == P]).
 
+-spec do_fix_list_arguments(pattern(), patterns()) -> pattern().
 do_fix_list_arguments(Pat, FixThese) ->
   case children(Pat) of
     undefined ->
@@ -101,6 +104,7 @@ do_fix_list_arguments(Pat, FixThese) ->
       set_children(Pat, [do_fix_list_arguments(C, FixThese) || C <- Children])
   end.
 
+-spec fix_either(pattern() | patterns()) -> pattern() | patterns().
 fix_either(Pat) when not is_list(Pat) ->
   either(lists:map(fun ([[_|_]=P]) -> req(P);
                        (P)         -> req(P)
@@ -122,6 +126,7 @@ fix_either([Children0|Groups0]) ->
     Groups -> fix_either(Groups)
   end.
 
+-spec fix_either(parent_pattern(), [child_pattern()]) -> [child_pattern()].
 fix_either(#either{}=Pat, Children)      ->
   [[C|Children] || C <- Pat#either.children];
 fix_either(#required{}=Pat, Children)    -> [Pat#required.children ++ Children];
@@ -129,6 +134,7 @@ fix_either(#optional{}=Pat, Children)    -> [Pat#optional.children ++ Children];
 fix_either(#one_or_more{}=Pat, Children) ->
   [Pat#one_or_more.children ++ Pat#one_or_more.children ++ Children].
 
+-spec flatten(pattern()) -> patterns().
 flatten(#required{children=Children})    -> flatten_children(Children);
 flatten(#either{children=Children})      -> flatten_children(Children);
 flatten(#one_or_more{children=Children}) -> flatten_children(Children);
@@ -137,48 +143,59 @@ flatten(#command{}=Cmd)                  -> [Cmd];
 flatten(#option{}=Opt)                   -> [Opt];
 flatten(#argument{}=Arg)                 -> [Arg].
 
+-spec flatten_children(patterns()) -> patterns().
 flatten_children(Children) ->
   lists:flatten(lists:map(fun flatten/1, Children)).
 
+-spec children(parent_pattern()) -> patterns();
+              (child_pattern())  -> undefined.
 children(#required{children=Children})    -> Children;
 children(#either{children=Children})      -> Children;
 children(#one_or_more{children=Children}) -> Children;
 children(#optional{children=Children})    -> Children;
 children(_)                               -> undefined.
 
+-spec set_children(parent_pattern(), patterns()) -> parent_pattern().
 set_children(#required{}    = P, Children) -> P#required{children=Children};
 set_children(#either{}      = P, Children) -> P#either{children=Children};
 set_children(#one_or_more{} = P, Children) -> P#one_or_more{children=Children};
 set_children(#optional{}    = P, Children) -> P#optional{children=Children}.
 
+-spec name(child_pattern()) -> string().
 name(#command{name=Name})                 -> Name;
 name(#argument{name=Name})                -> Name;
 name(#option{long=undefined, short=Name}) -> Name;
 name(#option{long=Name})                  -> Name.
 
+-spec value(child_pattern()) -> any().
 value(#command{value=Value})  -> Value;
 value(#argument{value=Value}) -> Value;
 value(#option{value=Value})   -> Value.
 
+-spec set_value(child_pattern(), any()) -> child_pattern().
 set_value(#command{}  = P, Value) -> P#command{value=Value};
 set_value(#argument{} = P, Value) -> P#argument{value=Value};
 set_value(#option{}   = P, Value) -> P#option{value=Value}.
 
+-spec set_default_value(child_pattern()) -> child_pattern().
 set_default_value(#argument{}         = P) -> P#argument{value=[]};
 set_default_value(#command{}          = P) -> P#command{value=0};
 set_default_value(#option{argcount=0} = P) -> P#option{value=0};
 set_default_value(#option{}           = P) -> P#option{value=[]}.
 
+-spec parse_doc_options(string()) -> options().
 parse_doc_options(Doc) ->
   [_|OptStrings] = re:split(Doc, "^ *-|\\n *-", [{return, list}]),
   [option_parse("-" ++ S) || S <- OptStrings].
 
+-spec strip(string()) -> string().
 strip(Str) ->
   StripLeft = fun (S) ->
                   lists:dropwhile(fun(C) -> lists:member(C, [$ , $\n]) end, S)
               end,
   lists:reverse(StripLeft(lists:reverse(StripLeft(Str)))).
 
+-spec option_parse(string()) -> #option{}.
 option_parse(Str) ->
   {Options, Desc} = partition(strip(Str), "  "),
   lists:foldl(fun([$-,$-|_] = S, Opt) -> Opt#option{long  = S};
@@ -187,12 +204,14 @@ option_parse(Str) ->
                   Opt#option{argcount = 1, value = default_value(Desc)}
               end, #option{}, string:tokens(Options, ",= ")).
 
+-spec default_value(string()) -> string() | undefined.
 default_value(Desc) ->
   case re:run(Desc,"\\[default: (.*)\\]", [{capture, [1], list}, caseless]) of
     {match, [DefaultValue]} -> DefaultValue;
     nomatch                 -> undefined
   end.
 
+-spec parse_args(string(), options()) -> [child_pattern()].
 parse_args(Args, Options) ->
   State = #state{ tokens  = string:tokens(Args, " ")
                 , options = Options
@@ -200,6 +219,7 @@ parse_args(Args, Options) ->
                 },
   parse_args_tokens(State).
 
+-spec parse_args_tokens(state()) -> [child_pattern()].
 parse_args_tokens(#state{tokens=[]}) -> [];
 parse_args_tokens(State0) ->
   case current(State0) of
@@ -225,6 +245,7 @@ mode(#state{mode=Mode})             -> Mode.
 
 long(#option{long=Long}) -> Long.
 
+-spec parse_long(state()) -> {[#option{}], state()}.
 parse_long(State0) ->
   {Raw, Value} = partition(current(State0), "="),
   Opt0 = [O || O <- options(State0), long(O) == Raw],
@@ -253,14 +274,17 @@ parse_long(State0) ->
     0 when Value == [] -> {[Opt#option{value = true}], State}
   end.
 
+-spec starts_with(string(), string()) -> boolean().
 starts_with(Str, SubStr) when is_list(Str), is_list(SubStr) ->
   string:str(Str, SubStr) == 1;
 starts_with(_, _) -> false.
 
+-spec parse_shorts(state()) -> {options(), state()}.
 parse_shorts(State) ->
   [$-|Str] = current(State),
   parse_shorts(Str, move(State), []).
 
+-spec parse_shorts([string()], state(), options()) -> {options(), state()}.
 parse_shorts([], State, Acc) -> {lists:reverse(Acc), State};
 parse_shorts([H|T], State, Acc) ->
  case [O || O <- options(State), tl(O#option.short) == [H]] of
@@ -278,12 +302,15 @@ parse_shorts([H|T], State, Acc) ->
      {[Opt#option{value = Value}|Acc], Rest}
  end.
 
+-spec add_option(state(), #option{}) -> state().
 add_option(State, Option) ->
   State#state{options=[Option|options(State)]}.
 
+-spec option(string()) -> #option{}.
 option(ShortName) ->
   #option{short = ShortName, argcount = 0, long = undefined, value = false}.
 
+-spec get_value_shorts(char(), string(), state()) -> {string(), state()}.
 get_value_shorts(H, [], State) ->
   case current(State) of
     []      -> throw({H, "requires an argument"});
@@ -291,6 +318,7 @@ get_value_shorts(H, [], State) ->
   end;
 get_value_shorts(_, Arg, State) -> {Arg, State}.
 
+-spec printable_usage(string()) -> string().
 printable_usage(Doc) ->
   case re:split(Doc, "([Uu][Ss][Aa][Gg][Ee]:)", [{return, list}]) of
     UsageSplit when length(UsageSplit) < 3 ->
@@ -302,6 +330,7 @@ printable_usage(Doc) ->
       strip(hd(L))
   end.
 
+-spec formal_usage(string()) -> string().
 formal_usage(PrintableUsage) ->
   %% Split and drop "usage:"
   [_Usage, ProgName|Args] = string:tokens(PrintableUsage, " \n"),
@@ -310,6 +339,7 @@ formal_usage(PrintableUsage) ->
       end,
   "( " ++ string:join(lists:map(F, Args), " ") ++ " )".
 
+-spec parse_pattern(string(), options()) -> {#required{}, options()}.
 parse_pattern(Source0, Options) ->
   %% Add spaces around []()| and ...
   Source = re:replace(Source0, "([\\[\\]\\(\\)\\|]|\\.\\.\\.)", " \\1 ",
@@ -323,6 +353,7 @@ parse_pattern(Source0, Options) ->
   {#required{children=Result}, options(State)}.
 
 % expr ::= seq ( '|' seq )* ;
+-spec parse_expr(state()) -> {patterns(), state()}.
 parse_expr(State0) ->
   {Seq, State} = parse_seq(State0),
   case current(State) of
@@ -330,6 +361,7 @@ parse_expr(State0) ->
     _   -> {Seq, State}
   end.
 
+-spec parse_expr(state(), patterns()) -> {patterns(), state()}.
 parse_expr(State0, Acc)                 ->
   debug("in parse_expr: ~p, ~p", [tokens(State0), Acc]),
   {Seq, State} = parse_seq(State0),
@@ -343,12 +375,15 @@ parse_expr(State0, Acc)                 ->
       end
    end.
 
+-spec maybe_required_seq(patterns()) -> pattern().
 maybe_required_seq([Seq]) -> Seq;
 maybe_required_seq(Seq)   -> #required{children=Seq}.
 
 %% seq ::= ( atom [ '...' ] )* ;
+-spec parse_seq(state()) -> {patterns(), state()}.
 parse_seq(State) -> parse_seq(State, []).
 
+-spec parse_seq(state(), patterns()) -> {patterns(), state()}.
 parse_seq(#state{tokens=[]}      = State, Acc) -> {lists:reverse(Acc), State};
 parse_seq(#state{tokens=["]"|_]} = State, Acc) -> {lists:reverse(Acc), State};
 parse_seq(#state{tokens=[")"|_]} = State, Acc) -> {lists:reverse(Acc), State};
@@ -364,6 +399,7 @@ parse_seq(State0, Acc) ->
 
 %% atom ::= '(' expr ')' | '[' expr ']' | 'options'
 %%       | long | shorts | argument | command ;
+-spec parse_atom(state()) -> {patterns(), state()}.
 parse_atom(State) ->
   debug("in parse atom: ~p", [tokens(State)]),
   case current(State) of
@@ -381,6 +417,7 @@ parse_atom(State) ->
       end
   end.
 
+-spec parse_optional(state()) -> {[#optional{}], state()}.
 parse_optional(State0) ->
   debug("parse optional ~p", [State0]),
   {Expr, State} = parse_expr(State0),
@@ -390,6 +427,7 @@ parse_optional(State0) ->
     _   -> throw("Unmatched '['")
   end.
 
+-spec parse_required(state()) -> {[#required{}], state()}.
 parse_required(State0) ->
   debug("parse required ~p", [tokens(State0)]),
   {Expr, State} = parse_expr(State0),
@@ -399,25 +437,33 @@ parse_required(State0) ->
     _   -> throw("Unmatched '('")
   end.
 
+-spec is_arg(string()) -> boolean().
 is_arg(S) ->
   (hd(S) == $< andalso lists:last(S) == $>) orelse string:to_upper(S) == S.
 
+-spec match(pattern(), patterns()) -> {boolean(), patterns(), patterns()}.
 match(Pat, Rest) ->
   {Bool, R, A} = match(Pat, Rest, []),
   {Bool, R, lists:reverse(A)}.
 
+-spec match(pattern(), patterns(), patterns()) ->
+               {boolean(), patterns(), patterns()}.
 match(#optional{}    = Pat, Rest, Acc) -> match_optional(Pat, Rest, Acc);
 match(#required{}    = Pat, Rest, Acc) -> match_required(Pat, Rest, Acc);
 match(#either{}      = Pat, Rest, Acc) -> match_either(Pat, Rest, Acc);
 match(#one_or_more{} = Pat, Rest, Acc) -> match_one_or_more(Pat, Rest, Acc);
 match(                 Pat, Rest, Acc) -> match_child_pattern(Pat, Rest, Acc).
 
+-spec match_optional(#optional{}, patterns(), patterns()) ->
+                        {boolean(), patterns(), patterns()}.
 match_optional(#optional{children=Children}, Rest0, Acc0) ->
   lists:foldl(fun(Pat, {true, R, A}) ->
                   {_, Rest, Acc} = match(Pat, R, A),
                   {true, Rest, Acc}
               end, {true, Rest0, Acc0}, Children).
 
+-spec match_required(#required{}, patterns(), patterns()) ->
+                        {boolean(), patterns(), patterns()}.
 match_required(#required{children=Children}, Rest0, Acc0) ->
   lists:foldl(fun(Pat, {true, R, A}) ->
                   case match(Pat, R, A) of
@@ -427,6 +473,8 @@ match_required(#required{children=Children}, Rest0, Acc0) ->
                  (_, {false, _, _}) -> {false, Rest0, Acc0}
               end, {true, Rest0, Acc0}, Children).
 
+-spec match_either(#either{}, patterns(), patterns()) ->
+                      {boolean(), patterns(), patterns()}.
 match_either(#either{children=Children}, Rest0, Acc0) ->
   Outcomes = lists:foldl(fun(Pat, Acc) ->
                              case match(Pat, Rest0, Acc0) of
@@ -442,6 +490,8 @@ match_either(#either{children=Children}, Rest0, Acc0) ->
 most_consumed({_, R, _}=Res, {_, Min, _}) when length(R) < length(Min) -> Res;
 most_consumed({_, _, _}    , Acc)                                      -> Acc.
 
+-spec match_one_or_more(#one_or_more{}, patterns(), patterns()) ->
+                           {boolean(), patterns(), patterns()}.
 match_one_or_more(#one_or_more{children=[Child]}, Rest0, Acc0) ->
   %% If the child is optional we do not need to consume anything
   ConsumptionNotRequired = is_record(Child, optional),
@@ -450,6 +500,8 @@ match_one_or_more(#one_or_more{children=[Child]}, Rest0, Acc0) ->
     {Rest  , Acc}  -> {true                   , Rest  , Acc }
   end.
 
+-spec consume_one_or_more(pattern(), patterns(), patterns()) ->
+                             {patterns(), patterns()}.
 consume_one_or_more(Pat, Rest0, Acc0) ->
   case match(Pat, Rest0, Acc0) of
     {true, Rest0, Acc0} ->
@@ -460,6 +512,8 @@ consume_one_or_more(Pat, Rest0, Acc0) ->
       {Rest, Acc}
   end.
 
+-spec match_child_pattern(pattern(), patterns(), patterns()) ->
+                             {boolean(), patterns(), patterns()}.
 match_child_pattern(Pat, Rest0, Acc0) ->
   case single_match(Pat, Rest0) of
     nomatch              -> {false, Rest0, Acc0};
@@ -477,20 +531,25 @@ match_child_pattern(Pat, Rest0, Acc0) ->
       {true, Rest, Acc}
   end.
 
+-spec replace(any(), any(), list()) -> list().
 replace(_Old, New, [])     -> [New];
 replace(Old, New, [Old|T]) -> [New|T];
 replace(Old, New, [H|T])   -> [H|replace(Old, New, T)].
 
+-spec single_match(pattern(), patterns()) ->
+                      nomatch | {match, child_pattern(), patterns()}.
 single_match(Pat, Rest) ->
   case lists:filter(match_fun(Pat), Rest) of
     []        -> nomatch;
     [Match|_] -> {match, match_result(Pat, Match), lists:delete(Match, Rest)}
   end.
 
+-spec match_result(child_pattern(), string()) -> child_pattern().
 match_result(#option{}   = Opt, O) -> Opt#option{value=O#option.value};
 match_result(#argument{} = Arg, A) -> Arg#argument{value=A#argument.value};
 match_result(#command{}  = Cmd, _) -> Cmd#command{value=true}.
 
+-spec match_fun(child_pattern()) -> fun((child_pattern()) -> boolean()).
 match_fun(#option{}=Opt) ->
   fun(#option{}=O) -> name(O) == name(Opt);
      (_)           -> false
@@ -504,6 +563,7 @@ match_fun(#command{name=Name}) ->
      (_)                    -> false
   end.
 
+-spec partition(string(), string()) -> {string(), string()}.
 partition(Str, Delim) ->
   case string:str(Str, Delim) of
     0 -> {Str, ""};
