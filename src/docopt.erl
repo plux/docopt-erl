@@ -943,17 +943,17 @@ parse_pattern_test_() ->
 
 arg(A) when is_list(A) -> #argument{name=A};
 arg(V)                 -> #argument{value=V}.
-arg(Arg, Value)       -> #argument{name=Arg, value=Value}.
-cmd(Cmd)              -> #command{name=Cmd}.
-cmd(Cmd, Value)       -> #command{name=Cmd, value=Value}.
-req(Children)         -> #required{children=Children}.
-either(Children)      -> #either{children=Children}.
-optional(Children)    -> #optional{children=Children}.
-one_or_more(Children) -> #one_or_more{children=Children}.
+arg(Arg, Value)        -> #argument{name=Arg, value=Value}.
+cmd(Cmd)               -> #command{name=Cmd}.
+cmd(Cmd, Value)        -> #command{name=Cmd, value=Value}.
+req(Children)          -> #required{children=Children}.
+either(Children)       -> #either{children=Children}.
+optional(Children)     -> #optional{children=Children}.
+one_or_more(Children)  -> #one_or_more{children=Children}.
 
-opt(Short)            -> #option{short=Short}.
-opt(Short, Long)      -> #option{short=Short, long=Long}.
-opt(Short, Long, 1)   -> #option{short=Short, long=Long, argcount=1, value=undefined}.
+opt(Short)             -> #option{short=Short}.
+opt(Short, Long)       -> #option{short=Short, long=Long}.
+opt(Short, Long, 1)    -> #option{short=Short, long=Long, argcount=1, value=undefined}.
 
 partition_test_() ->
   [ ?_assertEqual({"foobar", ""}     , partition("foobar"      , "abc"))
