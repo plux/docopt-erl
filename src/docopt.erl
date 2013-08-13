@@ -72,7 +72,7 @@ docopt(Doc, Args) ->
   Opts0                = parse_doc_options(Doc),
   {Pattern, Opts1}     = parse_pattern(formal_usage(Usage), Opts0),
   ParsedArgs           = parse_args(Args, Opts1),
-  {FixedPattern, Opts} = fix_list_arguments(Pattern, Opts1),
+  {FixedPattern, Opts} = fix_repeating_arguments(Pattern, Opts1),
   case match(FixedPattern, ParsedArgs) of
     {true, [], Collected} ->
       debug("\n"
@@ -94,20 +94,20 @@ docopt(Doc, Args) ->
     _Res -> throw(parse_failure)
   end.
 
--spec fix_list_arguments(pattern(), options()) -> {pattern(), options()}.
-fix_list_arguments(Pat, Opts) ->
+-spec fix_repeating_arguments(pattern(), options()) -> {pattern(), options()}.
+fix_repeating_arguments(Pat, Opts) ->
   Either    = [children(C) || C <- children(fix_either(Pat))],
   FixThese  = [E || Case <- Either, E <- Case, count(E, Case) > 1],
-  FixedPat  = do_fix_list_arguments(Pat, FixThese),
-  FixedOpts = [do_fix_list_arguments(Opt, FixThese) || Opt <- Opts],
+  FixedPat  = do_fix_repeating_arguments(Pat, FixThese),
+  FixedOpts = [do_fix_repeating_arguments(Opt, FixThese) || Opt <- Opts],
   {FixedPat, FixedOpts}.
 
 -spec count(any(), list()) -> non_neg_integer().
 count(X, Patterns) ->
   length([P || P <- Patterns, X == P]).
 
--spec do_fix_list_arguments(pattern(), patterns()) -> pattern().
-do_fix_list_arguments(Pat, FixThese) ->
+-spec do_fix_repeating_arguments(pattern(), patterns()) -> pattern().
+do_fix_repeating_arguments(Pat, FixThese) ->
   case children(Pat) of
     undefined ->
       case lists:member(Pat, FixThese) of
@@ -115,7 +115,7 @@ do_fix_list_arguments(Pat, FixThese) ->
         true  -> set_default_value(Pat)
       end;
     Children ->
-      set_children(Pat, [do_fix_list_arguments(C, FixThese) || C <- Children])
+      set_children(Pat, [do_fix_repeating_arguments(C, FixThese) || C <- Children])
   end.
 
 -spec fix_either(pattern() | patterns()) -> pattern() | patterns().
@@ -1060,7 +1060,7 @@ name_test_() ->
 
 list_argument_match_test_() ->
   M = fun (Pat, Args) ->
-          {Fixed, _} = fix_list_arguments(Pat, []),
+          {Fixed, _} = fix_repeating_arguments(Pat, []),
           match(Fixed, Args)
       end,
   [ ?_assertEqual({true, [], [arg("N", ["1", "2"])]},
@@ -1083,9 +1083,9 @@ list_argument_match_test_() ->
                     [arg(undefined, "1"), arg(undefined, "2")]))
   ].
 
-fix_list_arguments_test_() ->
+fix_repeating_arguments_test_() ->
   Fix = fun(Pat) ->
-            {Fixed, _} = fix_list_arguments(Pat, []),
+            {Fixed, _} = fix_repeating_arguments(Pat, []),
             Fixed
         end,
   [ ?_assertEqual(opt("-a"), Fix(opt("-a")))
