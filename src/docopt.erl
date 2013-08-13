@@ -1,3 +1,17 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% @doc
+%%%
+%%% Command-line interface parser that will make you smile.
+%%%
+%%% * http://docopt.org
+%%% * http://github.com/plux/docopt-erl
+%%% * Licensed under terms of MIT License (see LICENSE-MIT)
+%%%
+%%% @copyright 2013 Håkan Nilsson <haakan@gmail.com>
+%%%
+%%% @end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -module(docopt).
 
 -compile([export_all]).
